@@ -5,3 +5,5 @@ __pycache__/
 outputs/
 CV2/
 .DS_Store
+*.zip
+*.crdownload

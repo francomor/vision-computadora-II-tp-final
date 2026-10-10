@@ -15,7 +15,8 @@ Que hay:
   (tutorial de Plaut), con los mapas cacheados y recortados a la banda del horizonte.
 - caja_a_fisheye: lleva cajas de la cilindrica a la fisheye.
 - MODELOS / detector_yolo / detector_tv: detectores COCO con las clases ya traducidas a las del TP.
-- evaluar / tabla_resultados: map50, map50-95 y map estratificado por excentricidad radial.
+- evaluar / tabla_resultados: map50, map50-95 y map estratificado por excentricidad radial o por
+  angulo de incidencia theta (por="theta", cortes congelados 68,3 y 80,7 grados).
 - dibujar: cajas con supervision.
 
 Chequeo rapido del entorno: uv run python fisheye_utils.py
@@ -52,6 +53,9 @@ HFOV, VFOV = np.deg2rad(190), np.deg2rad(143)  # cubren todo el campo de la lent
 ELEV_ARRIBA, ELEV_ABAJO = np.deg2rad(45), np.deg2rad(45)  # banda alrededor del horizonte de la cilindrica
 ANILLOS = [0, 1 / 3, 2 / 3, 1.0]
 NOMBRES_ANILLOS = ["centro", "medio", "periferia"]
+# cortes congelados por angulo de incidencia en grados (rings.json del drive, terciles: 3970 cajas de gt por anillo)
+RINGS = RAIZ / "CV2/rings.json"
+ANILLOS_THETA = json.loads(RINGS.read_text())["cortes"] if RINGS.is_file() else [0, 68.28223046836945, 80.71525799894175, np.inf]
 
 sys.path.insert(0, str(RAIZ / "CV2/Scripts"))
 from convert_to_yolo import collect_points, desenvolver, tags_of  # noqa: E402
@@ -278,6 +282,7 @@ def a_clases_tp(xyxy, conf, cls, coco):
 # los mismos modelos para todas las ramas; cada valor se llama para cargar el modelo
 MODELOS = {
     **{f"yolo11{t}": (lambda t=t: detector_yolo(f"yolo11{t}.pt")) for t in "nsmlx"},
+    **{f"yolo26{t}": (lambda t=t: detector_yolo(f"yolo26{t}.pt")) for t in "nsmlx"},  # yolo26m es el acordado para las 4 ramas
     "fasterrcnn_mobilenet_v3": lambda: detector_tv(tvd.fasterrcnn_mobilenet_v3_large_fpn, tvd.FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT),
     "fasterrcnn_r50_v2": lambda: detector_tv(tvd.fasterrcnn_resnet50_fpn_v2, tvd.FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT),
     "maskrcnn_r50_v2": lambda: detector_tv(tvd.maskrcnn_resnet50_fpn_v2, tvd.MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT),
@@ -292,17 +297,39 @@ def radio(cajas, fila):
     return np.hypot(cx - fila.cx0, cy - fila.cy0) / np.hypot(fila.W / 2, fila.H / 2)
 
 
-def evaluar(p, filas, anillo=None):
-    """map50 y map50-95 de las predicciones p sobre las filas del test, opcionalmente solo un anillo radial
+@lru_cache(maxsize=None)
+def _tabla_theta(clave):
+    """theta [rad] y rho(theta) [px] muestreados para una calibracion, para invertir el polinomio por interpolacion"""
+    i = json.loads(clave)["intrinsic"]
+    th = np.linspace(0, np.deg2rad(120), 4001)
+    rho = i["k1"] * th + i["k2"] * th ** 2 + i["k3"] * th ** 3 + i["k4"] * th ** 4
+    n = np.argmax(np.diff(rho) <= 0) + 1 if np.any(np.diff(rho) <= 0) else len(rho)  # me quedo con el tramo monotono
+    return th[:n], rho[:n]
+
+
+def theta(cajas, fila):
+    """angulo de incidencia en grados del centro de cada caja, invirtiendo rho(theta) = k1 th + k2 th^2 + k3 th^3 + k4 th^4"""
+    i = json.loads(fila.calib)["intrinsic"]
+    cx, cy = (cajas[:, 0] + cajas[:, 2]) / 2, (cajas[:, 1] + cajas[:, 3]) / 2
+    rho = np.hypot(cx - fila.cx0, (cy - fila.cy0) / i["aspect_ratio"])  # get_mapping multiplica v por aspect_ratio
+    th, r = _tabla_theta(fila.calib)
+    return np.rad2deg(np.interp(rho, r, th))
+
+
+def evaluar(p, filas, anillo=None, por="radio"):
+    """map50 y map50-95 de las predicciones p sobre las filas del test, opcionalmente solo un anillo
 
     p es un dataframe con columnas stem, cajas (xyxy en la fisheye), conf y clases (ids del tp).
+    por="radio" usa la excentricidad normalizada (ANILLOS); por="theta" el angulo de incidencia con los
+    cortes congelados de rings.json (ANILLOS_THETA), que es la metrica que va al paper.
     """
     p = p.set_index("stem")
-    lo, hi = (ANILLOS[anillo], ANILLOS[anillo + 1]) if anillo is not None else (-np.inf, np.inf)
+    cortes, medida = (ANILLOS_THETA, theta) if por == "theta" else (ANILLOS, radio)
+    lo, hi = (cortes[anillo], cortes[anillo + 1]) if anillo is not None else (-np.inf, np.inf)
     P, T = [], []
     for fila in filas.itertuples():
         q = p.loc[fila.stem]
-        rg, rp = radio(fila.gt_cajas, fila), radio(q["cajas"], fila)
+        rg, rp = medida(fila.gt_cajas, fila), medida(q["cajas"], fila)
         mg, mp = (rg >= lo) & (rg < hi), (rp >= lo) & (rp < hi)
         T.append(sv.Detections(xyxy=fila.gt_cajas[mg], class_id=fila.gt_clases[mg]))
         P.append(sv.Detections(xyxy=q["cajas"][mp].astype(np.float32), class_id=q["clases"][mp], confidence=q["conf"][mp].astype(np.float32)))
@@ -310,14 +337,14 @@ def evaluar(p, filas, anillo=None):
     return r.map50, r.map50_95
 
 
-def tabla_resultados(preds, filas):
+def tabla_resultados(preds, filas, por="radio"):
     """una fila por modelo: map global, map por anillo y latencias medias (columnas ms_* que existan)"""
     salida = []
     for nombre, p in preds.items():
         m50, m5095 = evaluar(p, filas)
         f = {"modelo": nombre, "mAP50": m50, "mAP50-95": m5095}
         for i, a in enumerate(NOMBRES_ANILLOS):
-            f[f"mAP50 {a}"], f[f"mAP50-95 {a}"] = evaluar(p, filas, anillo=i)
+            f[f"mAP50 {a}"], f[f"mAP50-95 {a}"] = evaluar(p, filas, anillo=i, por=por)
         ms = [k for k in p.columns if k.startswith("ms_")]
         f.update({k: p[k].mean() for k in ms})
         f["ms_total"] = sum(f[k] for k in ms)

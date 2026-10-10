@@ -152,37 +152,42 @@ warm-up sobre el mismo hardware para las cuatro ramas.
 
 ---
 
-## 5. Resultados preliminares
+## 5. Resultados de la rama 1 (baseline)
 
-> Resultados de la rama 1 obtenidos con YOLOv8m durante la validación de la
-> metodología. La versión final de las cuatro ramas usa YOLO26m; las tablas
-> definitivas están en el paper.
+YOLO26m pre-entrenado en COCO, inferencia directa sobre las 1000 imágenes de
+prueba (`notebooks/rama1_baseline.ipynb`):
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5318 | 0,3377 |
-| medio | 68,3–80,7° | 3970 | 0,4273 | 0,2652 |
-| periferia | > 80,7° | 3970 | 0,1640 | 0,0920 |
-| global | — | 11910 | 0,3742 | 0,2303 |
+| centro | < 68,3° | 3970 | 0,5469 | 0,3605 |
+| medio | 68,3–80,7° | 3970 | 0,4534 | 0,2951 |
+| periferia | > 80,7° | 3970 | 0,1712 | 0,1021 |
+| global | — | 11910 | 0,3944 | 0,2522 |
 
-El detector pierde el 69% de su mAP@50 entre el anillo central y el periférico, y
-la caída es consistente en las tres clases.
+El detector pierde el 69% de su mAP@50 entre el anillo central y el periférico.
+Frente a la versión preliminar con YOLOv8m (0,374 global y 0,164 en periferia),
+YOLO26m mejora el centro pero deja la periferia prácticamente igual: un detector
+genérico más reciente no resuelve la distorsión.
 
 Para descartar que el fenómeno se explique por la reducción de escala aparente
 que introduce la proyección, se estratificó simultáneamente por ángulo y por
-tamaño de objeto según los rangos de área de COCO:
+tamaño de objeto según los rangos de área de COCO (mAP@50):
 
 | anillo | chico | mediano | grande |
 |---|---|---|---|
-| centro | 0,269 | 0,645 | 0,861 |
-| medio | 0,122 | 0,453 | 0,750 |
-| periferia | 0,024 | 0,163 | 0,526 |
+| centro | 0,252 | 0,618 | 0,802 |
+| medio | 0,110 | 0,469 | 0,691 |
+| periferia | 0,021 | 0,164 | 0,486 |
 
 La degradación persiste dentro de cada rango de tamaño, lo que indica un efecto
-geométrico y no un artefacto de escala. Se observa además una interacción: la
-pérdida relativa es del 91% en objetos pequeños y del 39% en grandes, sugiriendo
-que la deformación resulta más destructiva cuanto menor es la cantidad de píxeles
-que describen al objeto.
+geométrico y no un artefacto de escala. La pérdida relativa es del 92% en objetos
+pequeños y del 39% en grandes: la deformación resulta más destructiva cuanto menor
+es la cantidad de píxeles que describen al objeto.
+
+Por clase, `vehicle` es la más afectada (AP@50 de 0,774 en el centro a 0,159 en la
+periferia) y las cámaras laterales rinden mucho peor que la frontal y la trasera
+(mAP@50 0,28 en MVL/MVR contra 0,54 en FV y 0,51 en RV). Latencia: 11,7 ms por
+imagen (85 FPS) en una RTX 4080 SUPER.
 
 ---
 
