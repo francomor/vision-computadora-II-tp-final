@@ -227,14 +227,33 @@ coordenadas absolutas.
 
 ## 8. El número a batir
 
-Rama 1 preliminar, con YOLOv8m (hay que rehacerla con YOLO26m):
+Rama 1 definitiva, YOLO26m COCO sin fine-tuning (`notebooks/rama1_baseline.ipynb`):
 
-| anillo | θ | mAP@50 | mAP@50-95 |
-|---|---|---|---|
-| centro | < 68,3° | 0,5318 | 0,3377 |
-| medio | 68,3–80,7° | 0,4273 | 0,2652 |
-| periferia | > 80,7° | 0,1640 | 0,0920 |
-| global | — | 0,3742 | 0,2303 |
+| anillo | θ | n_gt | mAP@50 | mAP@50-95 |
+|---|---|---|---|---|
+| centro | < 68,3° | 3970 | 0,5469 | 0,3605 |
+| medio | 68,3–80,7° | 3970 | 0,4534 | 0,2951 |
+| periferia | > 80,7° | 3970 | 0,1712 | 0,1021 |
+| global | — | 11910 | 0,3944 | 0,2522 |
+
+Latencia: 11,7 ms por imagen (85 FPS) en una RTX 4080 SUPER.
+
+**Cómo comparar tu rama contra esta tabla.** Usá las mismas funciones que la rama 1,
+desde un notebook en `notebooks/`:
+
+```python
+from fisheye_utils import cargar_test, evaluar, tabla_resultados
+test = cargar_test()                     # 1000 imágenes, 11.910 cajas
+# p: DataFrame con columnas stem, cajas (xyxy en la FISHEYE original), conf, clases (ids del TP)
+evaluar(p, test)                         # (mAP@50, mAP@50-95) global
+evaluar(p, test, anillo=2, por="theta")  # periferia, con los cortes de CV2/rings.json
+tabla_resultados({"mi_rama": p}, test, por="theta")
+```
+
+`por="theta"` es la métrica del paper. El default `por="radio"` es la excentricidad
+en píxeles que usó la primera versión de la rama 2; sirve solo para comparar con esa
+versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo26m_1000.pkl`
+(mismo formato que `p`), por si querés graficar las dos ramas juntas.
 
 **La fila que importa es la de periferia.** Un modelo puede subir el mAP global
 sin mejorar nada ahí. Si tu rama sube el global pero deja la periferia igual, el
