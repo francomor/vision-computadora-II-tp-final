@@ -10,7 +10,7 @@ distorsión radial de las cámaras de surround view.
 - Franco Marcelo Morero
 - Nicolás Granato
 - Marcos Levi Riveros Koloszwa
-- Tadeo Rivero
+- Tadeo Riveros
 
 ---
 
@@ -197,8 +197,13 @@ imagen (85 FPS) en una RTX 4080 SUPER.
 notebooks/
     rama1_baseline.ipynb          detección directa sobre fisheye
     rama2_cilindrica.ipynb        proyección cilíndrica + remapeo inverso
-    rama3_finetune.ipynb          fine-tuning sobre fisheye
+    rama3_finetune.ipynb          fine-tuning sobre fisheye: evaluación en val y test
+    rama3_colab.ipynb             entrenamiento de la rama 3 en Google Colab (GPU)
     rama4_cilindrica_finetune.ipynb
+fisheye_utils.py                  funciones compartidas: carga del test, proyección
+                                  cilíndrica, detectores COCO y mAP por anillo (radio o θ)
+fisheye_aug.py                    rama 3: armado del dataset YOLO, entrenamiento y
+                                  augmentación de distorsión radial
 tools/
     make_test_split.py            partición con auditoría de casi-duplicados
     verify_split.py               verificación por sha256 de una copia local
@@ -207,6 +212,7 @@ tools/
     predict_baseline.py           inferencia y medición de latencia
     eval_radial.py                mAP global y estratificado por θ
     inspect_annotations.py        inspección del esquema de anotaciones
+    train_rama3.py                entrenamiento de la rama 3 desde la terminal
 config/
     class_map.json                WoodScape -> 3 clases
     coco_map.json                 COCO -> 3 clases
@@ -260,7 +266,23 @@ uv run python tools/eval_radial.py --yolo-dir outputs/yolo_ds \
     --pred-json outputs/pred/rama1/pred.json --out outputs/resultados/rama1 \
     --calibration config/calibration.json --rings-file config/rings.json \
     --cruce-tamano --etiqueta rama1
+
+# Fine-tuning sobre las fisheye sin rectificar (rama 3), 30 épocas.
+# --device mps en Mac o --device 0 con GPU NVIDIA; --variante radial entrena la extensión.
+uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
+    --imagenes <raiz>/rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
+    --modelo yolo11m.pt --cache ram
 ```
+
+**Rama 3.** `fisheye_aug.py` arma la estructura `images/` + `labels/` que espera
+Ultralytics con enlaces simbólicos a las imágenes originales (no las copia ni las
+recomprime) y controla los conteos de la partición (6148 / 1085 / 1000 imágenes).
+La variante `base` es el fine-tuning puro con las augmentaciones por defecto de
+Ultralytics; la extensión `radial` agrega una augmentación de distorsión radial,
+r_src = r·(1 + k·r²)/(1 + k) con k ~ U[−0,2; 0,3] y p = 0,5, aplicada antes del mosaico. Sin GPU
+local se puede entrenar en Colab con `notebooks/rama3_colab.ipynb`. La evaluación
+(val y test, por anillo, cámara y clase) y el fundamento teórico están en
+`notebooks/rama3_finetune.ipynb`.
 
 La partición se puede regenerar desde cero con `tools/make_test_split.py`
 usando la semilla registrada en `splits/split_config.json`; el resultado es

@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-train_rama3.py - entrena una variante de la rama 3 fuera del notebook (Kaggle o una PC con GPU NVIDIA).
+train_rama3.py - entrena una variante de la rama 3 fuera del notebook (la Mac con MPS o una GPU NVIDIA).
 
 Hace lo mismo que la seccion de entrenamiento de notebooks/rama3_finetune.ipynb: arma la estructura images/ +
 labels/ con preparar_yolo_ds (controla los numeros del equipo) y llama a entrenar() de fisheye_aug.py.
 
-Ejemplo con dos GPUs, una variante en cada una y en paralelo:
+Asi se entreno la variante base, en la Mac (MPS), desde la raiz del repo:
 
-  python tools/train_rama3.py --variante base   --device 0 --epochs 30 \
-      --imagenes /kaggle/input/<dataset>/rgb_images --ds /kaggle/working/ds_base   --salida /kaggle/working/runs
-  python tools/train_rama3.py --variante radial --device 1 --epochs 30 \
-      --imagenes /kaggle/input/<dataset>/rgb_images --ds /kaggle/working/ds_radial --salida /kaggle/working/runs
+  caffeinate -i uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
+      --imagenes rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
+      --modelo yolo11m.pt --cache ram 2>&1 | tee outputs/rama3/mac/train_base.log
 
-Cada variante usa su propia estructura (--ds) para que las dos corridas no escriban a la vez el mismo labels.cache.
+Con una GPU NVIDIA es lo mismo con --device 0 (sin caffeinate). En Colab lo llama notebooks/rama3_colab.ipynb.
+La extension se entrena con --variante radial. Si se corren las dos variantes a la vez, cada una necesita su propia
+estructura (--ds) para no escribir al mismo tiempo el mismo labels.cache.
 Las etiquetas y las listas por defecto son las de outputs/yolo_ds (convert_to_yolo.py).
 """
 

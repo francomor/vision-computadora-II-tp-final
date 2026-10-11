@@ -14,7 +14,8 @@ Que hay:
 - DistorsionRadial / YOLODatasetRadial / TrainerFisheye: la aplican dentro de Ultralytics, imagen por imagen y
   antes del mosaico. Con radial=None el trainer es el de Ultralytics sin cambios (variante base).
 - preparar_yolo_ds: arma images/ y labels/ con enlaces simbolicos para que Ultralytics encuentre las etiquetas.
-- entrenar: el mismo entrenamiento para las dos variantes, en la Mac o en Kaggle (tools/train_rama3.py).
+- entrenar: el mismo entrenamiento para las dos variantes, desde la terminal (tools/train_rama3.py) o en Colab
+  (notebooks/rama3_colab.ipynb).
 """
 import os
 
