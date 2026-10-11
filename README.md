@@ -123,27 +123,7 @@ El paso 3 debe producir 99 995 cajas sobre 8233 imágenes.
 
 ## 6. Uso
 
-Cada rama tiene su notebook en `notebooks/`. Los mismos pasos también corren por scripts:
-
-```bash
-# Ramas 1 y 2: inferencia con YOLO11m de COCO (--proyeccion cilindrica para la rama 2)
-uv run python tools/predict_baseline.py --yolo-dir outputs/yolo_ds \
-    --modelo yolo11m.pt --out outputs/pred/rama1 --coco-map config/coco_map.json
-
-# Evaluación por anillo (cualquier rama)
-uv run python tools/eval_radial.py --yolo-dir outputs/yolo_ds \
-    --pred-json outputs/pred/rama1/pred.json --out outputs/resultados/rama1 \
-    --calibration config/calibration.json --rings-file config/rings.json \
-    --cruce-tamano --etiqueta rama1
-
-# Rama 3: fine-tuning, 30 épocas (--device 0 con GPU NVIDIA, --variante radial para la extensión)
-uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
-    --imagenes <raiz>/rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
-    --modelo yolo11m.pt --cache ram
-
-# Rama 4: proyección cilíndrica, fine-tuning y evaluación
-uv run python entrenar_finetune.py --modelos yolo11n yolo11s yolo11m
-```
+Cada rama tiene su notebook en `notebooks/`.
 
 Sin GPU local, la rama 3 se puede entrenar en Colab con `notebooks/rama3_colab.ipynb`.
 
