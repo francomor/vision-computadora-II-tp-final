@@ -1,10 +1,11 @@
 """
-finetune_utils.py - fine-tuning de los 8 modelos de la rama 2, compartido por las ramas 3 y 4.
+finetune_utils.py - fine-tuning de los 8 modelos de la rama 2 sobre la proyeccion cilindrica (rama 4).
 
 Rama 4 (proyeccion="cilindrica"): reentrena sobre la cilindrica de fisheye_utils.
-Rama 3 (proyeccion="fisheye"): reentrena sobre la fisheye sin tocar.
-Las dos usan exactamente el mismo codigo, los mismos modelos y los mismos hiperparametros, asi la
-diferencia entre ellas es solo la rectificacion.
+proyeccion="fisheye" arma lo mismo sin rectificar, pero NO se uso para los resultados: la rama 3 se
+entreno con fisheye_aug.py (tools/train_rama3.py), con los mismos valores de HP_YOLO salvo el batch
+fisico (16) y la semilla (0). Como Ultralytics acumula gradientes hasta un batch nominal de 64, el
+optimizador (AdamW, lr 0.001429) y el weight decay son los mismos en las dos ramas.
 
 Uso desde un notebook en notebooks/ (igual que fisheye_utils):
 
@@ -20,8 +21,8 @@ Que hay:
 - poligonos_tp / etiquetas_cilindricas / mapa_instancias: objetos de una anotacion con el mismo filtro
   que cargar_gt, llevados a la cilindrica por su POLIGONO (no por la caja, que se inflaria en la periferia).
 - construir_split: arma images/, labels/ y masks/ por split. Con proyeccion="fisheye" arma lo mismo sin
-  rectificar, que es lo que necesita la rama 3: mismo codigo, cambia un solo factor.
-- MODELOS_RAMA4, HP_YOLO, HP_TV: los modelos de la rama 2 y los hiperparametros compartidos con la rama 3.
+  rectificar (alternativa, no usada para la rama 3).
+- MODELOS_RAMA4, HP_YOLO, HP_TV: los modelos de la rama 2 y los hiperparametros (HP_YOLO coincide con la rama 3, ver arriba).
 - entrenar: YOLO11 con Ultralytics y Faster/Mask R-CNN con un loop propio. Reanudables, eligen el
   checkpoint por mAP@50-95 en validacion (el fitness de Ultralytics 8.4 es exactamente ese).
 - detector_ft / predecir_test: inferencia sobre el test con el mismo flujo y la misma medicion de
@@ -61,7 +62,7 @@ SEMILLA = 42
 
 # ---------------------------------------------------------------- modelos e hiperparametros
 # Los mismos 8 modelos y en el mismo orden que MODELOS de fisheye_utils (rama 2).
-# HP_YOLO y HP_TV los tiene que usar tambien la rama 3: si se cambian aca, se cambian alla.
+# la rama 3 (fisheye_aug.py) usa los mismos valores de HP_YOLO salvo batch fisico y semilla.
 
 YOLOS = [f"yolo11{t}" for t in "nsmlx"]
 TV = {
@@ -79,7 +80,7 @@ assert sorted(MODELOS_FINETUNE) == sorted(MODELOS_RAMA4)
 HP_YOLO = dict(epochs=30, imgsz=IMGSZ, patience=10, seed=SEMILLA, deterministic=True, workers=4)
 # batch por modelo, pensado para que entre en los 6 GB de una GTX 1660 sin AMP y sin desbordar a la memoria
 # compartida de Windows (que es mucho mas lenta). Ultralytics acumula gradientes hasta un batch nominal de
-# 64, asi que el batch fisico casi no cambia el resultado. La rama 3 tiene que usar los mismos.
+# 64, asi que el batch fisico casi no cambia el resultado (la rama 3 uso 16).
 BATCH_YOLO = {"yolo11n": 8, "yolo11s": 4, "yolo11m": 2, "yolo11l": 2, "yolo11x": 1}
 
 HP_TV = dict(epochs=12, momentum=0.9, weight_decay=1e-4, warmup_iters=300, patience=4, flip=0.5,

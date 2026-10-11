@@ -4,7 +4,23 @@ anaconda_projects/
 __pycache__/
 .ipynb_checkpoints/
 *.pt
+# outputs/ no se versiona, salvo los pesos finales de las ramas 3 y 4 (y las curvas de entrenamiento de la rama 3)
+outputs/**
+!outputs/**/
+!outputs/rama3/mac/rama3_base/weights/best.pt
+!outputs/rama3/mac/rama3_base/results.csv
+!outputs/rama3/colab/rama3_radial/weights/best.pt
+!outputs/rama3/colab/rama3_radial/results.csv
+!outputs/rama4/train/*/weights/best.pt
 CV2/
 .DS_Store
 *.zip
 *.crdownload
+# dataset local (se baja de Kaggle, no se versiona)
+rgb_images/
+instance_annotations/
+
+# basura de Jupyter y Anaconda, y un clon del repo adentro del repo
+.virtual_documents/
+anaconda_projects/
+/vision-computadora-II-tp-final/

@@ -12,8 +12,8 @@ mecánica; esas seis reglas son lo que hace que el trabajo cierre.
 
 | Rama | Qué es | Quién |
 |---|---|---|
-| 1 | Baseline: YOLO26m COCO directo sobre fisheye | Tadeo |
-| 2 | Proyección cilíndrica + YOLO26m COCO | Franco |
+| 1 | Baseline: YOLO11m COCO directo sobre fisheye | Tadeo |
+| 2 | Proyección cilíndrica + YOLO11m COCO | Franco |
 | 3 | Fine-tuning sobre fisheye, sin rectificar | Marcos |
 | 4 | Proyección cilíndrica + fine-tuning | Nicolás |
 
@@ -21,7 +21,7 @@ Es un factorial 2×2: cruza rectificar o no con hacer fine-tuning o no. Sirve
 para separar cuánto aporta cada cosa por separado y si juntas aportan más o
 menos que la suma.
 
-**Las cuatro usan `yolo26m.pt`, `imgsz=640` y el mismo presupuesto de épocas.**
+**Las cuatro usan `yolo11m.pt`, `imgsz=640` y el mismo presupuesto de épocas.**
 Si alguien cambia el modelo o la resolución, su fila no entra en la tabla.
 
 ---
@@ -162,7 +162,7 @@ van a dar distintos y tu tabla no se va a poder comparar. Los congelados son
    el mAP necesita la cola de baja confianza para armar la curva
    precisión-recall. Filtrar ahí baja el mAP artificialmente. El umbral alto es
    para mostrarle detecciones a una persona, no para medir.
-6. **Mismo modelo, misma resolución, mismas épocas**: `yolo26m.pt`, `imgsz=640`.
+6. **Mismo modelo, misma resolución, mismas épocas**: `yolo11m.pt`, `imgsz=640`.
    Lo único que cambia entre ramas es el factor bajo estudio.
 
 ---
@@ -176,20 +176,37 @@ van a dar distintos y tu tabla no se va a poder comparar. Los congelados son
 09_eval_radial.bat          -> resultados\<rama>\metricas.txt
 ```
 
-En el `10` editá `MODELO=yolo26m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
+En el `10` editá `MODELO=yolo11m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
 `ETIQUETA`.
 
-### Ramas 3 y 4 (con fine-tuning)
-
-Entrenás con Ultralytics apuntando al `data.yaml` que generó el `07`:
+### Rama 3 (fine-tuning sin rectificar)
 
 ```
-yolo detect train model=yolo26m.pt data=yolo_ds\data.yaml imgsz=640 epochs=<N>
+uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
+    --imagenes <raiz>/rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
+    --modelo yolo11m.pt --cache ram
 ```
 
-Elegís checkpoint por mAP@50-95 de validación. Después generás predicciones
-sobre el test con `--save-txt --save-conf` y en el `09` dejás `PRED_JSON` vacío
-y completás `PRED_DIR` con la carpeta `labels` que produce.
+Con GPU NVIDIA, `--device 0`; sin GPU local, `notebooks/rama3_colab.ipynb`. La
+evaluación sobre validación y test está en `notebooks/rama3_finetune.ipynb`. Los
+pesos finales (`best.pt` de `base` y de `radial`) están en el repo, así que evaluar no
+requiere reentrenar.
+
+### Rama 4 (cilíndrica + fine-tuning)
+
+```
+uv run python entrenar_finetune.py --modelos yolo11n yolo11s yolo11m
+```
+
+Arma el dataset cilíndrico, entrena y predice sobre el test apenas termina cada
+modelo. `notebooks/rama4_cilindrica_finetune.ipynb` levanta los resultados. La opción
+`--rama 3` no forma parte del trabajo: escribe en la carpeta de la rama 3.
+
+Las dos ramas eligen el checkpoint por mAP@50-95 de validación (es el `fitness` de
+Ultralytics 8.4) y entrenan con los mismos valores: YOLO11m desde COCO, 30 épocas,
+`imgsz=640` y batch nominal 64. Solo cambian el batch físico (16 en la rama 3, 2 en
+la 4, por memoria) y la semilla. Para pasar las predicciones de test al `09`, se
+exportan a JSON con `finetune_utils.a_pred_json`.
 
 Podés correr el `09` sobre validación todas las veces que quieras durante el
 desarrollo, con `--split val`. El test queda intacto hasta el final.
@@ -198,8 +215,7 @@ desarrollo, con `--split val`. El test queda intacto hasta el final.
 
 ## 7. Lo específico de las ramas 2 y 4 (rectificación)
 
-Dos cosas que hay que resolver antes de escribir código, porque si se descubren
-tarde cuestan un día entero.
+Dos decisiones de diseño que comparten las dos ramas.
 
 **La proyección tiene que ser cilíndrica, no perspectiva.** La proyección
 perspectiva diverge al acercarse a 90° del eje óptico, así que rectificar a plano
@@ -215,9 +231,9 @@ caja en la imagen cilíndrica no tiene las mismas coordenadas que en la fisheye,
 el ángulo θ se calcula con la calibración de la original. Si evaluás directo, los
 anillos quedan mal asignados y tu rama no se puede comparar con ninguna otra.
 
-Concretamente: la rectificación tiene que guardar su mapeo, y por cada caja
-detectada hay que proyectar sus esquinas de vuelta al fisheye y tomar el
-bounding box resultante.
+Concretamente: la rectificación guarda su mapeo, y cada caja detectada vuelve a la
+fisheye muestreando 20 puntos por lado de su perímetro; la caja final es la que
+encierra esos puntos (`caja_a_fisheye` en `fisheye_utils.py`).
 
 Los parámetros de distorsión por imagen están en `calibration.json`:
 `rho(θ) = k₁θ + k₂θ² + k₃θ³ + k₄θ⁴`, con el centro óptico ya convertido a
@@ -227,19 +243,25 @@ coordenadas absolutas.
 
 ## 8. El número a batir
 
-Rama 1 definitiva, YOLO26m COCO sin fine-tuning (`notebooks/rama1_baseline.ipynb`):
+Rama 1 definitiva, YOLO11m COCO sin fine-tuning, medida con `tools/eval_radial.py`:
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5469 | 0,3605 |
-| medio | 68,3–80,7° | 3970 | 0,4534 | 0,2951 |
-| periferia | > 80,7° | 3970 | 0,1712 | 0,1021 |
-| global | — | 11910 | 0,3944 | 0,2522 |
+| centro | < 68,3° | 3970 | 0,5415 | 0,3523 |
+| medio | 68,3–80,7° | 3970 | 0,4321 | 0,2764 |
+| periferia | > 80,7° | 3970 | 0,1696 | 0,0959 |
+| global | — | 11910 | 0,3776 | 0,2386 |
 
-Latencia: 11,7 ms por imagen (85 FPS) en una RTX 4080 SUPER.
+Latencia: 17,0 ms por imagen (58 FPS) en una Mac con Apple M4 Max (MPS). La primera
+versión, con YOLO26m, daba 0,3944 global y 0,1712 en periferia (11,7 ms en una RTX 4080 SUPER).
 
-**Cómo comparar tu rama contra esta tabla.** Usá las mismas funciones que la rama 1,
-desde un notebook en `notebooks/`:
+**Cómo comparar tu rama contra esta tabla.** La tabla sale de `tools/eval_radial.py`
+(esquema *ignore* de COCO, validado contra `pycocotools` con
+`tools/validar_eval_radial.py`): exportá tus predicciones de test a JSON
+(`finetune_utils.a_pred_json`) y pasalas por ese script, como hace
+`notebooks/comparacion_2x2.ipynb`. Para iterar rápido desde un notebook en
+`notebooks/` sirven las funciones de `fisheye_utils`, que filtran por anillo en vez de
+ignorar y dan valores hasta 0,04 menores por anillo:
 
 ```python
 from fisheye_utils import cargar_test, evaluar, tabla_resultados
@@ -250,9 +272,9 @@ evaluar(p, test, anillo=2, por="theta")  # periferia, con los cortes de CV2/ring
 tabla_resultados({"mi_rama": p}, test, por="theta")
 ```
 
-`por="theta"` es la métrica del paper. El default `por="radio"` es la excentricidad
+`por="theta"` es la estratificación del paper. El default `por="radio"` es la excentricidad
 en píxeles que usó la primera versión de la rama 2; sirve solo para comparar con esa
-versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo26m_1000.pkl`
+versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo11m_1000.pkl`
 (mismo formato que `p`), por si querés graficar las dos ramas juntas.
 
 **La fila que importa es la de periferia.** Un modelo puede subir el mAP global
@@ -276,15 +298,11 @@ resultado es que tu estrategia no ataca el problema que estudiamos.
 
 ---
 
-## 10. Pendientes del equipo
+## 10. Trabajo futuro
 
-- **Latencia**: la mide una sola persona, en una sola máquina, para las cuatro
-  ramas. Medida en GPUs distintas no va en la misma tabla.
 - **`two_wheeler` rinde bajo en todos los anillos** (AP@50 0,19 contra 0,51 de
-  `vehicle`). Conviene revisar si influye que `rider` esté mapeado a `person`:
+  `vehicle`). Queda por analizar si influye que `rider` esté mapeado a `person`:
   una moto con conductor genera dos cajas superpuestas en la referencia.
-- **Control opcional**: los objetos periféricos suelen estar truncados por el
-  borde, y un objeto cortado es más difícil aunque no haya distorsión. Se
-  resolvería repitiendo el análisis sin las cajas que tocan el borde.
-- **Paper, repo, video y presentación**: la exposición es el 50% de la nota y el
-  video de demo (máximo 2 minutos) es lo que más se subestima.
+- **Objetos truncados por el borde**: los objetos periféricos suelen estar cortados
+  por el borde de la imagen, y un objeto cortado es más difícil aunque no haya
+  distorsión. Se controlaría repitiendo el análisis sin las cajas que tocan el borde.
