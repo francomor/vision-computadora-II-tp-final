@@ -1,0 +1,42 @@
+{
+  "generated_for": "TP final Vision por Computadora II - CEIA FIUBA",
+  "dataset": "WoodScape (Valeo)",
+  "dataset_root": "D:\\CV2\\Woodscapes",
+  "version": 2,
+  "seed": 20261012,
+  "n_test": 1000,
+  "group_mode": "auto",
+  "hash_bits": 256,
+  "thresh_bits": 26,
+  "max_index_gap": 5,
+  "max_group": 40,
+  "images_total": 8234,
+  "counts": {
+    "test": 1000,
+    "quarantine": 1,
+    "train_pool": 7233,
+    "groups": 8120
+  },
+  "test_by_camera": {
+    "FV": 247,
+    "MVL": 251,
+    "MVR": 261,
+    "RV": 241
+  },
+  "train_by_camera": {
+    "FV": 1790,
+    "RV": 1745,
+    "MVR": 1884,
+    "MVL": 1814
+  },
+  "annotation_dir": "instance_annotations",
+  "leakage_audit": {
+    "flagged": 1,
+    "median": 39.0,
+    "min": 9,
+    "alert_bits": 15,
+    "remediated_train_images": 1,
+    "flagged_after_remediation": 0
+  },
+  "sha256_included": true
+}

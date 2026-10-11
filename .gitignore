@@ -7,3 +7,6 @@ CV2/
 .DS_Store
 *.zip
 *.crdownload
+# dataset local (se baja de Kaggle, no se versiona)
+rgb_images/
+instance_annotations/

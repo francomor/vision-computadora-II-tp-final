@@ -1,0 +1,11 @@
+{
+  "modo": "quantile",
+  "unidad": "grados",
+  "cortes": [
+    0.0,
+    68.28223046836945,
+    80.71525799894175,
+    1000000000.0
+  ],
+  "referencia": "angulo de incidencia (calibration.json, 23 calibraciones)"
+}

@@ -1,0 +1,34 @@
+{
+  "_comentario": [
+    "Mapeo de etiquetas de WoodScape (instance_annotations) a las clases del TP.",
+    "Poner null para excluir una etiqueta. El orden de 'clases' define el id YOLO.",
+    "Toda etiqueta que no figure aca se ignora en silencio (son las semanticas:",
+    "road_surface, sky, construction, pole, lane_marking, etc.).",
+    "Cambiar esto es una decision del equipo y va justificada en el paper."
+  ],
+
+  "clases": ["vehicle", "person", "two_wheeler"],
+
+  "mapeo": {
+    "car": "vehicle",
+    "van": "vehicle",
+    "bus": "vehicle",
+    "truck": "vehicle",
+    "trailer": "vehicle",
+    "caravan": "vehicle",
+
+    "person": "person",
+    "rider": "person",
+
+    "bicycle": "two_wheeler",
+    "motorcycle": "two_wheeler",
+
+    "grouped_vehicles": null,
+    "grouped_pedestrian_and_animals": null,
+    "other_wheeled_transport": null,
+    "train/tram": null,
+    "animal": null,
+    "movable_object": null,
+    "ego_vehicle": null
+  }
+}
