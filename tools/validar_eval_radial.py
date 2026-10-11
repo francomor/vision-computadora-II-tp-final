@@ -3,7 +3,7 @@
 validar_eval_radial.py - compara eval_radial.py contra pycocotools, global y anillo por anillo.
 
 pycocotools no sabe de anillos, pero su areaRng hace exactamente el esquema que queremos sobre el campo
-"area". El truco es poner theta en ese campo (al ground truth y a las detecciones) y pedir
+"area". La prueba pone theta en ese campo (al ground truth y a las detecciones) y pedir
 areaRng = [lo, hi] de cada anillo. Para el rango global se usa el area real. Si las dos
 implementaciones coinciden a 4 decimales, eval_radial reproduce COCO.
 

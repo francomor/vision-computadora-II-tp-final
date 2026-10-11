@@ -1,5 +1,5 @@
 """
-fisheye_utils.py - funciones compartidas por las tres ramas del TP (WoodScape fisheye).
+fisheye_utils.py - funciones compartidas por las ramas del TP (WoodScape fisheye).
 
 Uso desde un notebook en notebooks/:
 
@@ -46,7 +46,7 @@ MANIFEST = RAIZ / "CV2/split_v1/manifest.csv"
 CLASS_MAP = RAIZ / "CV2/Scripts/class_map.json"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-IMGSZ = 640  # misma resolucion para las tres ramas (regla 5)
+IMGSZ = 640  # misma resolucion para todas las ramas (regla 6 de GUIA_EQUIPO.md)
 CONF = 0.01  # umbral bajo: el map necesita la curva completa de precision-recall
 MIN_AREA, MIN_SIDE = 300, 8  # mismo filtro que convert_to_yolo.py
 HFOV, VFOV = np.deg2rad(190), np.deg2rad(143)  # cubren todo el campo de la lente
@@ -229,7 +229,7 @@ def cilindrica(fila, img=None):
 
 def caja_a_fisheye(cajas, mapx, mapy, W, H, n=20):
     """reproyecta cajas xyxy de la cilindrica a la fisheye muestreando n puntos por lado"""
-    # ponytail: caja axis-aligned del contorno curvo, en la periferia infla el area; cajas rotadas si hace falta
+    # limitacion: la caja axis-aligned del contorno curvo infla el area en la periferia (cajas rotadas como extension)
     hc, wc = mapx.shape
     t = np.linspace(0, 1, n)
     salida = np.zeros((len(cajas), 4), dtype=np.float32)

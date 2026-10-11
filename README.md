@@ -10,7 +10,7 @@ distorsión radial de las cámaras de surround view.
 - Franco Marcelo Morero
 - Nicolás Granato
 - Marcos Levi Riveros Koloszwa
-- Tadeo Riveros
+- Tadeo Riveros Koloszwa
 
 ---
 
@@ -55,7 +55,7 @@ Las cuatro ramas usan **YOLO11m**, la misma resolución de entrada, el mismo map
 de clases y el mismo presupuesto de épocas. Lo único que varía entre celdas es el
 factor bajo estudio.
 
-**Nota sobre la rectificación.** Se usa proyección cilíndrica y no perspectiva:
+**Elección de la rectificación.** Se usa proyección cilíndrica y no perspectiva:
 la proyección perspectiva diverge al aproximarse a 90° del eje óptico, de modo
 que rectificar a plano obligaría a recortar el campo de visión y eliminaría
 justamente la región periférica que el trabajo busca medir. Las detecciones de
@@ -236,7 +236,7 @@ sección 5), pero no la diferencia entre ramas.
 **Limitaciones.** Una corrida por rama, sin varianza entre semillas. La comparación
 se hace en la fisheye y con cajas; con contornos o máscaras, las ramas rectificadas
 podrían perder menos. Los notebooks reportan el esquema de filtrado de
-`fisheye_utils`, que da valores hasta 0,03 menores por anillo que `eval_radial.py`
+`fisheye_utils`, que da valores hasta 0,04 menores por anillo que `eval_radial.py`
 con las mismas conclusiones.
 
 ---
@@ -279,21 +279,20 @@ splits/
     manifest.csv                  cámara, grupo, split y sha256 por imagen
     split_config.json             parámetros y semilla
     leakage_audit.csv             pares test-train más próximos
-outputs/                          predicciones, métricas y figuras (no versionado)
+outputs/                          predicciones, métricas y figuras (no versionado, salvo
+                                  los pesos finales de las ramas 3 y 4)
 vpc2_fisheye.png                  diagrama del trabajo
 ```
 
-`eval_radial.py`, `predict_baseline.py` y `build_calibration.py` son
-reconstrucciones: los originales del equipo no quedaron en el repo. `eval_radial.py`
-replica `pycocotools` con θ en lugar del área y coincide con él en todos los anillos
-(`validar_eval_radial.py`: diferencia máxima de 1e-16 sobre las predicciones de las
-ramas 1 y 3) y reproduce los números del original en la rama 4 (diferencias de
-0,001 como máximo, el redondeo con que se reportaron). `predict_baseline.py` reproduce las predicciones del notebook de la
-rama 1 (las mismas cajas) y `build_calibration.py` regenera `config/calibration.json`
-byte a byte desde las calibraciones de Valeo. Los notebooks y `fisheye_utils.py` esperan además
-la carpeta `CV2/` del Drive del equipo, con el
-test, la calibración, el manifest y `Scripts/convert_to_yolo.py` (ver
-`GUIA_EQUIPO.md`).
+`eval_radial.py` replica `pycocotools` con θ en lugar del área: coincide con él en
+todos los anillos (`validar_eval_radial.py`, diferencia máxima de 1e-16 sobre las
+predicciones de las ramas 1 y 3) y con los valores reportados en el notebook de la
+rama 4 (diferencias de 0,001 como máximo, el redondeo con que se reportaron).
+`predict_baseline.py` reproduce las predicciones del notebook de la rama 1 (las mismas
+cajas) y `build_calibration.py` regenera `config/calibration.json` byte a byte desde
+las calibraciones de Valeo. Los notebooks y `fisheye_utils.py` esperan además la
+carpeta `CV2/` del Drive del equipo, con el test, la calibración, el manifest y
+`Scripts/convert_to_yolo.py` (ver `GUIA_EQUIPO.md`).
 
 ---
 
@@ -371,6 +370,26 @@ entrena: levanta lo que deja el script. Usa los mismos valores de entrenamiento 
 la rama 3 (YOLO11m desde COCO, 30 épocas, `imgsz=640`, batch nominal 64, mismo
 optimizador y criterio de checkpoint), salvo el batch físico (2, por la memoria de
 la GPU) y la semilla.
+
+### Evaluar sin reentrenar
+
+El repositorio incluye los pesos finales de las ramas con fine-tuning:
+
+| rama | pesos |
+|---|---|
+| 3, `base` | `outputs/rama3/mac/rama3_base/weights/best.pt` |
+| 3, `radial` (extensión) | `outputs/rama3/colab/rama3_radial/weights/best.pt` |
+| 4, YOLO11n, s y m | `outputs/rama4/train/yolo11{n,s,m}/weights/best.pt` |
+
+Las ramas 1 y 2 usan YOLO11m de COCO, que se descarga en la raíz del repo con:
+
+```bash
+uv run python -c "from ultralytics import YOLO; YOLO('yolo11m.pt')"
+```
+
+Con esos pesos, los datos preparados como se indica arriba y la carpeta `CV2/` del
+Drive del equipo, `notebooks/comparacion_2x2.ipynb` reproduce la tabla de la sección 6
+y `notebooks/rama3_finetune.ipynb` la evaluación de la rama 3, sin entrenar.
 
 La partición se puede regenerar desde cero con `tools/make_test_split.py`
 usando la semilla registrada en `splits/split_config.json`; el resultado es

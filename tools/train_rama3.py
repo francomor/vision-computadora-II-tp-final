@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-train_rama3.py - entrena una variante de la rama 3 fuera del notebook (la Mac con MPS o una GPU NVIDIA).
+train_rama3.py - entrena una variante de la rama 3 fuera del notebook (una Mac con MPS o una GPU NVIDIA).
 
 Hace lo mismo que la seccion de entrenamiento de notebooks/rama3_finetune.ipynb: arma la estructura images/ +
 labels/ con preparar_yolo_ds (controla los numeros del equipo) y llama a entrenar() de fisheye_aug.py.
 
-Asi se entreno la variante base, en la Mac (MPS), desde la raiz del repo:
+Asi se entreno la variante base, en una Mac (MPS), desde la raiz del repo:
 
   caffeinate -i uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
       --imagenes rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \

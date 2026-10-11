@@ -1,7 +1,7 @@
 # TP Visión por Computadora II — Detección en imágenes fisheye
 
 Carpeta compartida del equipo. Acá está **el split oficial** del dataset y los
-scripts para reproducirlo. Todo lo que entrenemos las tres ramas sale de acá.
+scripts para reproducirlo. Todo lo que entrenen las cuatro ramas sale de acá.
 
 ---
 
@@ -18,7 +18,7 @@ drive_package\
     train_pool.txt           las 7233 imágenes para entrenar y validar
     quarantine.txt           1 imagen excluida (casi-duplicado del test)
     manifest.csv             archivo, cámara, grupo, split y sha256 de cada imagen
-    split_config.json        semilla y parámetros, para citar en el paper
+    split_config.json        semilla y parámetros de la partición
     leakage_audit.csv        los 200 pares test-train más parecidos
     test_set\
         rgb_images\              las 1000 imágenes de test (1,9 GB)
@@ -149,8 +149,8 @@ regenerarlo desde `calibration_raw\calibration.zip`.
 Copiá `rings.json` del Drive a tu `yolo_ds\`.
 
 **Esto no es opcional.** Si falta, el evaluador calcula los cortes sobre tus
-propias predicciones, te van a dar distintos a los de los demás y las tres
-tablas no se van a poder comparar. Los cortes congelados son 68,3° y 80,7°.
+propias predicciones, te van a dar distintos a los de los demás y las tablas
+de las ramas no se van a poder comparar. Los cortes congelados son 68,3° y 80,7°.
 
 ### Paso 9 — Generar predicciones y evaluar
 
@@ -178,15 +178,15 @@ En el `09` hay tres líneas para editar por rama: `PRED_JSON` (o `PRED_DIR`),
 2. **`quarantine.txt` no existe para nadie.** Es una imagen casi idéntica a una
    del test; usarla sería leakage por la puerta de atrás.
 3. **No modificar `class_map.json` por cuenta propia.** Si creés que un mapeo
-   está mal, se discute y se cambia para los tres a la vez. Si cada uno entrena
+   está mal, se discute y se cambia para todos a la vez. Si cada uno entrena
    con clases distintas, no hay comparación posible.
 4. **No recomprimir ni convertir las imágenes.** Pasarlas a JPEG cambia los
    píxeles, rompe los sha256 y arruina la comparabilidad.
-5. **Mismo preprocesamiento base en las tres ramas**: resolución de entrada,
+5. **Mismo preprocesamiento base en las cuatro ramas**: resolución de entrada,
    clases y presupuesto de épocas. Lo único que cambia entre ramas es la
    estrategia bajo estudio.
 6. **No tocar `rings.json` ni `coco_map.json`.** Son los que hacen que los
-   números de los tres sean comparables.
+   números de todas las ramas sean comparables.
 7. **No subir el umbral de confianza en la inferencia.** El `10` usa
    `--conf 0.001` a propósito: el mAP necesita la cola de detecciones de baja
    confianza para armar la curva precisión-recall. Filtrar ahí baja el mAP
@@ -203,7 +203,7 @@ En el `09` hay tres líneas para editar por rama: `PRED_JSON` (o `PRED_DIR`),
 | 1 | `person` | person, rider |
 | 2 | `two_wheeler` | bicycle, motorcycle |
 
-Decisiones tomadas, por si las preguntan en la defensa:
+Decisiones tomadas:
 
 - **`rider` va a `person`**, criterio COCO. La persona arriba de la moto es un
   objeto distinto de la moto, y sus cajas se superponen a propósito.
@@ -220,11 +220,11 @@ Decisiones tomadas, por si las preguntan en la defensa:
 
 ---
 
-## 6. Cómo se armó el split (esto va al paper)
+## 6. Cómo se armó el split
 
 El riesgo era el leakage por frames contiguos: si dos imágenes casi idénticas de
 la misma grabación caen una en train y otra en test, el mAP sube por
-memorización y las tres ramas se benefician por igual, con lo que la comparación
+memorización y todas las ramas se benefician por igual, con lo que la comparación
 pierde sentido.
 
 Se verificó con hashes perceptuales de 256 bits. Dos resultados:
@@ -265,7 +265,10 @@ decimales.
 **Los anillos se cortan en los terciles empíricos** de la distribución angular,
 para que los tres tengan cantidades comparables de objetos (3970 cada uno).
 
-### Resultados de referencia (rama A: YOLOv8m COCO, sin fine-tuning)
+### Resultados de referencia (YOLOv8m COCO, sin fine-tuning)
+
+Medición preliminar de la metodología con YOLOv8m. La rama 1 definitiva usa YOLO11m y
+sus números están en la sección 5 del README.
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
@@ -283,24 +286,21 @@ sea solo por la reducción de escala aparente:
 | medio | 0,122 | 0,453 | 0,750 |
 | periferia | 0,024 | 0,163 | 0,526 |
 
-**Este es el número a batir.** Las ramas B y C tienen que mostrar recuperación en
+**Este es el número a batir.** Las ramas 2 a 4 tienen que mostrar recuperación en
 la fila de periferia. Un modelo puede subir el mAP global sin mejorar nada ahí:
 la fila que importa es la tercera.
 
 ---
 
-## 8. Pendiente
+## 8. Observaciones
 
-- **Ramas B y C**: sin empezar. Es lo que falta para que haya comparación.
-- **Latencia**: hay que medirla una sola vez, en una sola máquina, para las tres
-  ramas. Si se mide en distintas GPU los números no van en la misma tabla.
 - **`two_wheeler` rinde bajo en todos los anillos** (AP@50 de 0,19 contra 0,51 de
-  `vehicle`). Parte es dificultad real, pero conviene revisar si influye que
+  `vehicle`). Parte es dificultad real; queda por analizar si influye que
   `rider` esté mapeado a `person`: una moto con conductor genera dos cajas
   superpuestas en la referencia.
-- **Control opcional**: los objetos periféricos suelen estar truncados por el
-  borde, y un objeto cortado es más difícil aunque no haya distorsión. Se
-  resolvería repitiendo el análisis sin las cajas que tocan el borde.
+- **Objetos truncados por el borde**: los objetos periféricos suelen estar
+  cortados por el borde, y un objeto cortado es más difícil aunque no haya
+  distorsión. Se controlaría repitiendo el análisis sin las cajas que tocan el borde.
 
 El dataset exige citar la fuente en toda publicación: ver
 `WoodScape_License_and_Terms_of_Use.pdf` y https://woodscape.valeo.com/

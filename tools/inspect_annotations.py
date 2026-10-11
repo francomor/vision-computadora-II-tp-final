@@ -147,7 +147,7 @@ def main() -> None:
     if not counter:
         print("  No se detectaron etiquetas con las claves habituales.")
         print(f"  Claves buscadas: {LABEL_KEYS}")
-        print("  Mirar el esquema de arriba y avisar cual es la clave correcta.")
+        print("  Revisar el esquema de arriba para identificar la clave correcta.")
     else:
         total = sum(counter.values())
         print(f"\n  {'etiqueta':<28} {'instancias':>10} {'%':>7}")

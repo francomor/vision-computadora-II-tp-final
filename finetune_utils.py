@@ -62,7 +62,7 @@ SEMILLA = 42
 
 # ---------------------------------------------------------------- modelos e hiperparametros
 # Los mismos 8 modelos y en el mismo orden que MODELOS de fisheye_utils (rama 2).
-# la rama 3 (fisheye_aug.py) usa los mismos valores de HP_YOLO salvo batch fisico y semilla: si se cambian aca, avisar.
+# la rama 3 (fisheye_aug.py) usa los mismos valores de HP_YOLO salvo batch fisico y semilla.
 
 YOLOS = [f"yolo11{t}" for t in "nsmlx"]
 TV = {

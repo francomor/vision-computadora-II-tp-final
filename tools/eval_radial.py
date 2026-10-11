@@ -2,8 +2,8 @@
 """
 eval_radial.py - mAP@50 y mAP@50-95 global y por anillo de angulo de incidencia theta, con el esquema de COCO.
 
-Reconstruccion del evaluador del equipo (el original no quedo en el repo). Replica pycocotools
-(evaluateImg + accumulate) poniendo theta en el lugar del area, como hace areaRng: en cada anillo
+Replica pycocotools (evaluateImg + accumulate) poniendo theta en el lugar del area, como hace areaRng:
+en cada anillo
   * los objetos de referencia de otros anillos se marcan ignore (no suman al recall),
   * una deteccion que coincide con un objeto ignorado no cuenta ni como acierto ni como error,
   * una deteccion sin pareja cuyo centro cae fuera del anillo se ignora.

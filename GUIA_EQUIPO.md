@@ -188,7 +188,9 @@ uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
 ```
 
 Con GPU NVIDIA, `--device 0`; sin GPU local, `notebooks/rama3_colab.ipynb`. La
-evaluación sobre validación y test está en `notebooks/rama3_finetune.ipynb`.
+evaluación sobre validación y test está en `notebooks/rama3_finetune.ipynb`. Los
+pesos finales (`best.pt` de `base` y de `radial`) están en el repo, así que evaluar no
+requiere reentrenar.
 
 ### Rama 4 (cilíndrica + fine-tuning)
 
@@ -197,8 +199,8 @@ uv run python entrenar_finetune.py --modelos yolo11n yolo11s yolo11m
 ```
 
 Arma el dataset cilíndrico, entrena y predice sobre el test apenas termina cada
-modelo. `notebooks/rama4_cilindrica_finetune.ipynb` levanta los resultados. No usen
-`--rama 3`: es una alternativa que no se usó y escribe en la carpeta de la rama 3.
+modelo. `notebooks/rama4_cilindrica_finetune.ipynb` levanta los resultados. La opción
+`--rama 3` no forma parte del trabajo: escribe en la carpeta de la rama 3.
 
 Las dos ramas eligen el checkpoint por mAP@50-95 de validación (es el `fitness` de
 Ultralytics 8.4) y entrenan con los mismos valores: YOLO11m desde COCO, 30 épocas,
@@ -213,8 +215,7 @@ desarrollo, con `--split val`. El test queda intacto hasta el final.
 
 ## 7. Lo específico de las ramas 2 y 4 (rectificación)
 
-Dos cosas que hay que resolver antes de escribir código, porque si se descubren
-tarde cuestan un día entero.
+Dos decisiones de diseño que comparten las dos ramas.
 
 **La proyección tiene que ser cilíndrica, no perspectiva.** La proyección
 perspectiva diverge al acercarse a 90° del eje óptico, así que rectificar a plano
@@ -230,9 +231,9 @@ caja en la imagen cilíndrica no tiene las mismas coordenadas que en la fisheye,
 el ángulo θ se calcula con la calibración de la original. Si evaluás directo, los
 anillos quedan mal asignados y tu rama no se puede comparar con ninguna otra.
 
-Concretamente: la rectificación tiene que guardar su mapeo, y por cada caja
-detectada hay que proyectar sus esquinas de vuelta al fisheye y tomar el
-bounding box resultante.
+Concretamente: la rectificación guarda su mapeo, y cada caja detectada vuelve a la
+fisheye muestreando 20 puntos por lado de su perímetro; la caja final es la que
+encierra esos puntos (`caja_a_fisheye` en `fisheye_utils.py`).
 
 Los parámetros de distorsión por imagen están en `calibration.json`:
 `rho(θ) = k₁θ + k₂θ² + k₃θ³ + k₄θ⁴`, con el centro óptico ya convertido a
@@ -255,11 +256,12 @@ Latencia: 17,0 ms por imagen (58 FPS) en una Mac con Apple M4 Max (MPS). La prim
 versión, con YOLO26m, daba 0,3944 global y 0,1712 en periferia (11,7 ms en una RTX 4080 SUPER).
 
 **Cómo comparar tu rama contra esta tabla.** La tabla sale de `tools/eval_radial.py`
-(esquema *ignore* de COCO): exportá tus predicciones de test a JSON
+(esquema *ignore* de COCO, validado contra `pycocotools` con
+`tools/validar_eval_radial.py`): exportá tus predicciones de test a JSON
 (`finetune_utils.a_pred_json`) y pasalas por ese script, como hace
 `notebooks/comparacion_2x2.ipynb`. Para iterar rápido desde un notebook en
 `notebooks/` sirven las funciones de `fisheye_utils`, que filtran por anillo en vez de
-ignorar y dan valores hasta 0,03 menores por anillo:
+ignorar y dan valores hasta 0,04 menores por anillo:
 
 ```python
 from fisheye_utils import cargar_test, evaluar, tabla_resultados
@@ -296,23 +298,11 @@ resultado es que tu estrategia no ataca el problema que estudiamos.
 
 ---
 
-## 10. Pendientes del equipo
+## 10. Trabajo futuro
 
-- **Latencia y θ con un solo evaluador: resuelto.** `notebooks/comparacion_2x2.ipynb`
-  corre las cuatro ramas en la Mac de Marcos (M4 Max) y las mide con `evaluar` de
-  `fisheye_utils`, por θ y por radio. La tabla final está en la sección 6 del README.
-- **`eval_radial.py`, `predict_baseline.py` y `build_calibration.py`: reconstruidos**
-  en `tools/`, porque los originales no aparecieron. `eval_radial.py` coincide con
-  `pycocotools` (`tools/validar_eval_radial.py`) y `build_calibration.py` regenera
-  `config/calibration.json` byte a byte. En la rama 4, `eval_radial.py` reproduce los
-  números del original de Nico con diferencias de 0,001 como máximo. La tabla del
-  2×2 del README está medida con él. `config/coco_map.json` también
-  se agregó, con el mismo mapeo que `fisheye_utils.py`.
 - **`two_wheeler` rinde bajo en todos los anillos** (AP@50 0,19 contra 0,51 de
-  `vehicle`). Conviene revisar si influye que `rider` esté mapeado a `person`:
+  `vehicle`). Queda por analizar si influye que `rider` esté mapeado a `person`:
   una moto con conductor genera dos cajas superpuestas en la referencia.
-- **Control opcional**: los objetos periféricos suelen estar truncados por el
-  borde, y un objeto cortado es más difícil aunque no haya distorsión. Se
-  resolvería repitiendo el análisis sin las cajas que tocan el borde.
-- **Paper, repo, video y presentación**: la exposición es el 50% de la nota y el
-  video de demo (máximo 2 minutos) es lo que más se subestima.
+- **Objetos truncados por el borde**: los objetos periféricos suelen estar cortados
+  por el borde de la imagen, y un objeto cortado es más difícil aunque no haya
+  distorsión. Se controlaría repitiendo el análisis sin las cajas que tocan el borde.

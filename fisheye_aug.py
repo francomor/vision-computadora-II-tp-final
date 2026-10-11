@@ -152,7 +152,7 @@ class DistorsionRadial:
                                        axis=1).astype(np.float32)
             label["cls"] = label["cls"][ok]
             segs = label.get("segments", [])
-            if len(segs):  # nuestras etiquetas son solo cajas; esto queda por si alguien entrena con poligonos
+            if len(segs):  # las etiquetas del TP son solo cajas; esto cubre etiquetas con poligonos
                 R = radio_max(w, h, *centro)
                 movidos = []
                 for s, valido in zip(segs, ok):

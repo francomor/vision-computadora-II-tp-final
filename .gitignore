@@ -2,7 +2,14 @@
 __pycache__/
 .ipynb_checkpoints/
 *.pt
-outputs/
+# outputs/ no se versiona, salvo los pesos finales de las ramas 3 y 4 (y las curvas de entrenamiento de la rama 3)
+outputs/**
+!outputs/**/
+!outputs/rama3/mac/rama3_base/weights/best.pt
+!outputs/rama3/mac/rama3_base/results.csv
+!outputs/rama3/colab/rama3_radial/weights/best.pt
+!outputs/rama3/colab/rama3_radial/results.csv
+!outputs/rama4/train/*/weights/best.pt
 CV2/
 .DS_Store
 *.zip

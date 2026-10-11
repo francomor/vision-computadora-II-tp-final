@@ -48,7 +48,7 @@ def carpetas(rama, prueba):
 
 
 class Log:
-    """imprime y deja todo en un archivo, para revisar a la manana lo que paso a la noche"""
+    """imprime cada linea y la guarda en el log de la corrida"""
 
     def __init__(self, path):
         self.path = Path(path)
@@ -76,8 +76,8 @@ def main():
     ap.add_argument("--modelos", nargs="+", default=None, help="por defecto MODELOS_FINETUNE (los 8, de menor a mayor costo)")
     ap.add_argument("--solo-dataset", action="store_true")
     ap.add_argument("--sin-test", action="store_true", help="no predice ni evalua sobre el test")
-    ap.add_argument("--epocas-yolo", type=int, default=None, help="pisa HP_YOLO['epochs'] (avisar a la rama 3)")
-    ap.add_argument("--epocas-tv", type=int, default=None, help="pisa HP_TV['epochs'] (avisar a la rama 3)")
+    ap.add_argument("--epocas-yolo", type=int, default=None, help="pisa HP_YOLO['epochs'] (la rama 3 usa el mismo valor)")
+    ap.add_argument("--epocas-tv", type=int, default=None, help="pisa HP_TV['epochs']")
     args = ap.parse_args()
 
     import torch
@@ -204,7 +204,7 @@ def main():
             res.to_csv(salidas / "resultados.csv")
             log(f"resultados (metrica de fisheye_utils, la misma de la rama 2):\n{res.round(3).to_string()}")
             if args.prueba:
-                log("ojo: con dos epocas y pocas imagenes estas metricas no significan nada, la prueba solo verifica el flujo")
+                log("[aviso] con dos epocas y pocas imagenes estas metricas no son representativas: la prueba solo verifica el flujo")
     if not usar_theta and not args.prueba:
         log("eval_radial se omitio: falta eval_radial.py, calibration.json o rings.json en CV2/")
 
