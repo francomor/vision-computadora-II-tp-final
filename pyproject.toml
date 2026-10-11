@@ -17,3 +17,13 @@ dependencies = [
     "jupyterlab",
     "nbconvert",
 ]
+
+# en Windows, torch y torchvision con CUDA; en Mac y Linux no cambia nada
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu126", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu126", marker = "sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
