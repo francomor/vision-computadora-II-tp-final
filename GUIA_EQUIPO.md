@@ -12,8 +12,8 @@ mecánica; esas seis reglas son lo que hace que el trabajo cierre.
 
 | Rama | Qué es | Quién |
 |---|---|---|
-| 1 | Baseline: YOLO26m COCO directo sobre fisheye | Tadeo |
-| 2 | Proyección cilíndrica + YOLO26m COCO | Franco |
+| 1 | Baseline: YOLO11m COCO directo sobre fisheye | Tadeo |
+| 2 | Proyección cilíndrica + YOLO11m COCO | Franco |
 | 3 | Fine-tuning sobre fisheye, sin rectificar | Marcos |
 | 4 | Proyección cilíndrica + fine-tuning | Nicolás |
 
@@ -21,7 +21,7 @@ Es un factorial 2×2: cruza rectificar o no con hacer fine-tuning o no. Sirve
 para separar cuánto aporta cada cosa por separado y si juntas aportan más o
 menos que la suma.
 
-**Las cuatro usan `yolo26m.pt`, `imgsz=640` y el mismo presupuesto de épocas.**
+**Las cuatro usan `yolo11m.pt`, `imgsz=640` y el mismo presupuesto de épocas.**
 Si alguien cambia el modelo o la resolución, su fila no entra en la tabla.
 
 ---
@@ -162,7 +162,7 @@ van a dar distintos y tu tabla no se va a poder comparar. Los congelados son
    el mAP necesita la cola de baja confianza para armar la curva
    precisión-recall. Filtrar ahí baja el mAP artificialmente. El umbral alto es
    para mostrarle detecciones a una persona, no para medir.
-6. **Mismo modelo, misma resolución, mismas épocas**: `yolo26m.pt`, `imgsz=640`.
+6. **Mismo modelo, misma resolución, mismas épocas**: `yolo11m.pt`, `imgsz=640`.
    Lo único que cambia entre ramas es el factor bajo estudio.
 
 ---
@@ -176,7 +176,7 @@ van a dar distintos y tu tabla no se va a poder comparar. Los congelados son
 09_eval_radial.bat          -> resultados\<rama>\metricas.txt
 ```
 
-En el `10` editá `MODELO=yolo26m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
+En el `10` editá `MODELO=yolo11m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
 `ETIQUETA`.
 
 ### Ramas 3 y 4 (con fine-tuning)
@@ -184,7 +184,7 @@ En el `10` editá `MODELO=yolo26m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
 Entrenás con Ultralytics apuntando al `data.yaml` que generó el `07`:
 
 ```
-yolo detect train model=yolo26m.pt data=yolo_ds\data.yaml imgsz=640 epochs=<N>
+yolo detect train model=yolo11m.pt data=yolo_ds\data.yaml imgsz=640 epochs=<N>
 ```
 
 Elegís checkpoint por mAP@50-95 de validación. Después generás predicciones
@@ -227,16 +227,17 @@ coordenadas absolutas.
 
 ## 8. El número a batir
 
-Rama 1 definitiva, YOLO26m COCO sin fine-tuning (`notebooks/rama1_baseline.ipynb`):
+Rama 1 definitiva, YOLO11m COCO sin fine-tuning (`notebooks/rama1_baseline.ipynb`):
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5469 | 0,3605 |
-| medio | 68,3–80,7° | 3970 | 0,4534 | 0,2951 |
-| periferia | > 80,7° | 3970 | 0,1712 | 0,1021 |
-| global | — | 11910 | 0,3944 | 0,2522 |
+| centro | < 68,3° | 3970 | 0,5317 | 0,3471 |
+| medio | 68,3–80,7° | 3970 | 0,4173 | 0,2687 |
+| periferia | > 80,7° | 3970 | 0,1598 | 0,0920 |
+| global | — | 11910 | 0,3776 | 0,2386 |
 
-Latencia: 11,7 ms por imagen (85 FPS) en una RTX 4080 SUPER.
+Latencia: 17,0 ms por imagen (58 FPS) en una Mac con Apple M4 Max (MPS). La primera
+versión, con YOLO26m, daba 0,3944 global y 0,1712 en periferia (11,7 ms en una RTX 4080 SUPER).
 
 **Cómo comparar tu rama contra esta tabla.** Usá las mismas funciones que la rama 1,
 desde un notebook en `notebooks/`:
@@ -252,7 +253,7 @@ tabla_resultados({"mi_rama": p}, test, por="theta")
 
 `por="theta"` es la métrica del paper. El default `por="radio"` es la excentricidad
 en píxeles que usó la primera versión de la rama 2; sirve solo para comparar con esa
-versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo26m_1000.pkl`
+versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo11m_1000.pkl`
 (mismo formato que `p`), por si querés graficar las dos ramas juntas.
 
 **La fila que importa es la de periferia.** Un modelo puede subir el mAP global

@@ -281,8 +281,8 @@ def a_clases_tp(xyxy, conf, cls, coco):
 
 # los mismos modelos para todas las ramas; cada valor se llama para cargar el modelo
 MODELOS = {
-    **{f"yolo11{t}": (lambda t=t: detector_yolo(f"yolo11{t}.pt")) for t in "nsmlx"},
-    **{f"yolo26{t}": (lambda t=t: detector_yolo(f"yolo26{t}.pt")) for t in "nsmlx"},  # yolo26m es el acordado para las 4 ramas
+    **{f"yolo11{t}": (lambda t=t: detector_yolo(f"yolo11{t}.pt")) for t in "nsmlx"},  # yolo11m es el acordado para las 4 ramas
+    **{f"yolo26{t}": (lambda t=t: detector_yolo(f"yolo26{t}.pt")) for t in "nsmlx"},
     "fasterrcnn_mobilenet_v3": lambda: detector_tv(tvd.fasterrcnn_mobilenet_v3_large_fpn, tvd.FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT),
     "fasterrcnn_r50_v2": lambda: detector_tv(tvd.fasterrcnn_resnet50_fpn_v2, tvd.FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT),
     "maskrcnn_r50_v2": lambda: detector_tv(tvd.maskrcnn_resnet50_fpn_v2, tvd.MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT),

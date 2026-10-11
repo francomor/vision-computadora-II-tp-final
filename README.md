@@ -51,7 +51,7 @@ los datos.
 
 ![diagrama](vpc2_fisheye.png)
 
-Las cuatro ramas usan **YOLO26m**, la misma resolución de entrada, el mismo mapeo
+Las cuatro ramas usan **YOLO11m**, la misma resolución de entrada, el mismo mapeo
 de clases y el mismo presupuesto de épocas. Lo único que varía entre celdas es el
 factor bajo estudio.
 
@@ -154,20 +154,21 @@ warm-up sobre el mismo hardware para las cuatro ramas.
 
 ## 5. Resultados de la rama 1 (baseline)
 
-YOLO26m pre-entrenado en COCO, inferencia directa sobre las 1000 imágenes de
+YOLO11m pre-entrenado en COCO, inferencia directa sobre las 1000 imágenes de
 prueba (`notebooks/rama1_baseline.ipynb`):
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5469 | 0,3605 |
-| medio | 68,3–80,7° | 3970 | 0,4534 | 0,2951 |
-| periferia | > 80,7° | 3970 | 0,1712 | 0,1021 |
-| global | — | 11910 | 0,3944 | 0,2522 |
+| centro | < 68,3° | 3970 | 0,5317 | 0,3471 |
+| medio | 68,3–80,7° | 3970 | 0,4173 | 0,2687 |
+| periferia | > 80,7° | 3970 | 0,1598 | 0,0920 |
+| global | — | 11910 | 0,3776 | 0,2386 |
 
-El detector pierde el 69% de su mAP@50 entre el anillo central y el periférico.
-Frente a la versión preliminar con YOLOv8m (0,374 global y 0,164 en periferia),
-YOLO26m mejora el centro pero deja la periferia prácticamente igual: un detector
-genérico más reciente no resuelve la distorsión.
+El detector pierde el 70% de su mAP@50 entre el anillo central y el periférico.
+Cambiar de generación de detector no modifica el resultado: YOLOv8m obtiene 0,374
+global y 0,164 en periferia, y YOLO26m 0,394 y 0,171. Tres generaciones de YOLO
+quedan entre 0,16 y 0,17 en la periferia: un detector genérico más reciente no
+resuelve la distorsión.
 
 Para descartar que el fenómeno se explique por la reducción de escala aparente
 que introduce la proyección, se estratificó simultáneamente por ángulo y por
@@ -175,19 +176,19 @@ tamaño de objeto según los rangos de área de COCO (mAP@50):
 
 | anillo | chico | mediano | grande |
 |---|---|---|---|
-| centro | 0,252 | 0,618 | 0,802 |
-| medio | 0,110 | 0,469 | 0,691 |
-| periferia | 0,021 | 0,164 | 0,486 |
+| centro | 0,255 | 0,606 | 0,762 |
+| medio | 0,088 | 0,420 | 0,660 |
+| periferia | 0,019 | 0,147 | 0,453 |
 
 La degradación persiste dentro de cada rango de tamaño, lo que indica un efecto
-geométrico y no un artefacto de escala. La pérdida relativa es del 92% en objetos
-pequeños y del 39% en grandes: la deformación resulta más destructiva cuanto menor
+geométrico y no un artefacto de escala. La pérdida relativa es del 93% en objetos
+pequeños y del 41% en grandes: la deformación resulta más destructiva cuanto menor
 es la cantidad de píxeles que describen al objeto.
 
-Por clase, `vehicle` es la más afectada (AP@50 de 0,774 en el centro a 0,159 en la
+Por clase, `vehicle` es la más afectada (AP@50 de 0,771 en el centro a 0,171 en la
 periferia) y las cámaras laterales rinden mucho peor que la frontal y la trasera
-(mAP@50 0,28 en MVL/MVR contra 0,54 en FV y 0,51 en RV). Latencia: 11,7 ms por
-imagen (85 FPS) en una RTX 4080 SUPER.
+(mAP@50 0,26 en MVL/MVR contra 0,52 en FV y 0,50 en RV). Latencia: 17,0 ms por
+imagen (58 FPS) en una Mac con Apple M4 Max (MPS).
 
 ---
 
@@ -259,7 +260,7 @@ indica una versión diferente de `class_map.json`.
 ```bash
 # Inferencia con modelo preentrenado (ramas 1 y 2)
 uv run python tools/predict_baseline.py --yolo-dir outputs/yolo_ds \
-    --modelo yolo26m.pt --out outputs/pred/rama1 --coco-map config/coco_map.json
+    --modelo yolo11m.pt --out outputs/pred/rama1 --coco-map config/coco_map.json
 
 # Evaluación estratificada (las cuatro ramas)
 uv run python tools/eval_radial.py --yolo-dir outputs/yolo_ds \
