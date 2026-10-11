@@ -280,7 +280,10 @@ splits/
     split_config.json             parámetros y semilla
     leakage_audit.csv             pares test-train más próximos
 outputs/                          predicciones, métricas y figuras (no versionado, salvo
-                                  los pesos finales de las ramas 3 y 4)
+                                  los resultados de la rama 2 y los pesos finales de
+                                  las ramas 3 y 4)
+paper_ieee/                       fuente LaTeX del paper y script de sus figuras
+paper_fisheye_ieee.pdf            paper compilado (formato conferencia IEEE)
 vpc2_fisheye.png                  diagrama del trabajo
 ```
 
@@ -413,5 +416,5 @@ derivado: https://woodscape.valeo.com/
 }
 ```
 
-El análisis completo y la discusión de resultados están en el paper (formato
-conferencia IEEE).
+El análisis completo y la discusión de resultados están en el paper,
+`paper_fisheye_ieee.pdf` (formato conferencia IEEE).
