@@ -242,20 +242,24 @@ coordenadas absolutas.
 
 ## 8. El número a batir
 
-Rama 1 definitiva, YOLO11m COCO sin fine-tuning (`notebooks/rama1_baseline.ipynb`):
+Rama 1 definitiva, YOLO11m COCO sin fine-tuning, medida con `tools/eval_radial.py`:
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5317 | 0,3471 |
-| medio | 68,3–80,7° | 3970 | 0,4173 | 0,2687 |
-| periferia | > 80,7° | 3970 | 0,1598 | 0,0920 |
+| centro | < 68,3° | 3970 | 0,5415 | 0,3523 |
+| medio | 68,3–80,7° | 3970 | 0,4321 | 0,2764 |
+| periferia | > 80,7° | 3970 | 0,1696 | 0,0959 |
 | global | — | 11910 | 0,3776 | 0,2386 |
 
 Latencia: 17,0 ms por imagen (58 FPS) en una Mac con Apple M4 Max (MPS). La primera
 versión, con YOLO26m, daba 0,3944 global y 0,1712 en periferia (11,7 ms en una RTX 4080 SUPER).
 
-**Cómo comparar tu rama contra esta tabla.** Usá las mismas funciones que la rama 1,
-desde un notebook en `notebooks/`:
+**Cómo comparar tu rama contra esta tabla.** La tabla sale de `tools/eval_radial.py`
+(esquema *ignore* de COCO): exportá tus predicciones de test a JSON
+(`finetune_utils.a_pred_json`) y pasalas por ese script, como hace
+`notebooks/comparacion_2x2.ipynb`. Para iterar rápido desde un notebook en
+`notebooks/` sirven las funciones de `fisheye_utils`, que filtran por anillo en vez de
+ignorar y dan valores hasta 0,03 menores por anillo:
 
 ```python
 from fisheye_utils import cargar_test, evaluar, tabla_resultados
@@ -266,7 +270,7 @@ evaluar(p, test, anillo=2, por="theta")  # periferia, con los cortes de CV2/ring
 tabla_resultados({"mi_rama": p}, test, por="theta")
 ```
 
-`por="theta"` es la métrica del paper. El default `por="radio"` es la excentricidad
+`por="theta"` es la estratificación del paper. El default `por="radio"` es la excentricidad
 en píxeles que usó la primera versión de la rama 2; sirve solo para comparar con esa
 versión. Las predicciones de la rama 1 están en `outputs/rama1/preds_yolo11m_1000.pkl`
 (mismo formato que `p`), por si querés graficar las dos ramas juntas.
@@ -294,14 +298,16 @@ resultado es que tu estrategia no ataca el problema que estudiamos.
 
 ## 10. Pendientes del equipo
 
-- **Latencia**: la mide una sola persona, en una sola máquina, para las cuatro
-  ramas. Medida en GPUs distintas no va en la misma tabla. Las ramas 1 y 3 ya
-  están medidas en la Mac de Marcos (M4 Max); faltan la 2 y la 4 en esa máquina.
-- **θ con un solo evaluador**: la rama 1 usa `evaluar(por="theta")` de
-  `fisheye_utils` y la rama 4 usa `eval_radial.py`, que marca como *ignore* los
-  objetos de otros anillos en vez de filtrarlos. Para la tabla del paper las
-  cuatro ramas se miden con el mismo. `eval_radial.py`, `predict_baseline.py` y
-  `build_calibration.py` todavía no están en el repo.
+- **Latencia y θ con un solo evaluador: resuelto.** `notebooks/comparacion_2x2.ipynb`
+  corre las cuatro ramas en la Mac de Marcos (M4 Max) y las mide con `evaluar` de
+  `fisheye_utils`, por θ y por radio. La tabla final está en la sección 6 del README.
+- **`eval_radial.py`, `predict_baseline.py` y `build_calibration.py`: reconstruidos**
+  en `tools/`, porque los originales no aparecieron. `eval_radial.py` coincide con
+  `pycocotools` (`tools/validar_eval_radial.py`) y `build_calibration.py` regenera
+  `config/calibration.json` byte a byte. En la rama 4, `eval_radial.py` reproduce los
+  números del original de Nico con diferencias de 0,001 como máximo. La tabla del
+  2×2 del README está medida con él. `config/coco_map.json` también
+  se agregó, con el mismo mapeo que `fisheye_utils.py`.
 - **`two_wheeler` rinde bajo en todos los anillos** (AP@50 0,19 contra 0,51 de
   `vehicle`). Conviene revisar si influye que `rider` esté mapeado a `person`:
   una moto con conductor genera dos cajas superpuestas en la referencia.

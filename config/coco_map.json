@@ -1,0 +1,20 @@
+{
+  "_comentario": [
+    "Clases de COCO (nombres de Ultralytics) a las clases del TP, para los modelos sin fine-tuning (ramas 1 y 2).",
+    "Es el mismo mapeo que COCO_YOLO de fisheye_utils.py. Las clases de COCO que no figuran se descartan.",
+    "Cambiar esto es una decision del equipo y va justificada en el paper."
+  ],
+
+  "clases": ["vehicle", "person", "two_wheeler"],
+
+  "mapeo": {
+    "car": "vehicle",
+    "bus": "vehicle",
+    "truck": "vehicle",
+
+    "person": "person",
+
+    "bicycle": "two_wheeler",
+    "motorcycle": "two_wheeler"
+  }
+}

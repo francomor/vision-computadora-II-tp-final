@@ -155,20 +155,21 @@ warm-up sobre el mismo hardware para las cuatro ramas.
 ## 5. Resultados de la rama 1 (baseline)
 
 YOLO11m pre-entrenado en COCO, inferencia directa sobre las 1000 imágenes de
-prueba (`notebooks/rama1_baseline.ipynb`):
+prueba (`notebooks/rama1_baseline.ipynb`), medido con `tools/eval_radial.py`:
 
 | anillo | θ | n_gt | mAP@50 | mAP@50-95 |
 |---|---|---|---|---|
-| centro | < 68,3° | 3970 | 0,5317 | 0,3471 |
-| medio | 68,3–80,7° | 3970 | 0,4173 | 0,2687 |
-| periferia | > 80,7° | 3970 | 0,1598 | 0,0920 |
+| centro | < 68,3° | 3970 | 0,5415 | 0,3523 |
+| medio | 68,3–80,7° | 3970 | 0,4321 | 0,2764 |
+| periferia | > 80,7° | 3970 | 0,1696 | 0,0959 |
 | global | — | 11910 | 0,3776 | 0,2386 |
 
-El detector pierde el 70% de su mAP@50 entre el anillo central y el periférico.
-Cambiar de generación de detector no modifica el resultado: YOLOv8m obtiene 0,374
-global y 0,164 en periferia, y YOLO26m 0,394 y 0,171. Tres generaciones de YOLO
-quedan entre 0,16 y 0,17 en la periferia: un detector genérico más reciente no
-resuelve la distorsión.
+El detector pierde el 69% de su mAP@50 entre el anillo central y el periférico.
+Cambiar de generación de detector no modifica el resultado: con este mismo
+evaluador, YOLOv8m obtiene 0,374 global y 0,164 en periferia; con el de
+`fisheye_utils`, YOLO26m da 0,394 y 0,171, contra 0,378 y 0,160 de YOLO11m. Tres
+generaciones de YOLO quedan entre 0,16 y 0,17 en la periferia: un detector genérico
+más reciente no resuelve la distorsión.
 
 Para descartar que el fenómeno se explique por la reducción de escala aparente
 que introduce la proyección, se estratificó simultáneamente por ángulo y por
@@ -176,23 +177,71 @@ tamaño de objeto según los rangos de área de COCO (mAP@50):
 
 | anillo | chico | mediano | grande |
 |---|---|---|---|
-| centro | 0,255 | 0,606 | 0,762 |
-| medio | 0,088 | 0,420 | 0,660 |
-| periferia | 0,019 | 0,147 | 0,453 |
+| centro | 0,301 | 0,654 | 0,841 |
+| medio | 0,118 | 0,467 | 0,749 |
+| periferia | 0,030 | 0,175 | 0,510 |
 
 La degradación persiste dentro de cada rango de tamaño, lo que indica un efecto
-geométrico y no un artefacto de escala. La pérdida relativa es del 93% en objetos
-pequeños y del 41% en grandes: la deformación resulta más destructiva cuanto menor
+geométrico y no un artefacto de escala. La pérdida relativa es del 90% en objetos
+pequeños y del 39% en grandes: la deformación resulta más destructiva cuanto menor
 es la cantidad de píxeles que describen al objeto.
 
-Por clase, `vehicle` es la más afectada (AP@50 de 0,771 en el centro a 0,171 en la
+Por clase, `vehicle` es la más afectada (AP@50 de 0,777 en el centro a 0,185 en la
 periferia) y las cámaras laterales rinden mucho peor que la frontal y la trasera
 (mAP@50 0,26 en MVL/MVR contra 0,52 en FV y 0,50 en RV). Latencia: 17,0 ms por
 imagen (58 FPS) en una Mac con Apple M4 Max (MPS).
 
 ---
 
-## 6. Estructura del repositorio
+## 6. Resultados del diseño 2×2
+
+Las cuatro ramas sobre las mismas 1000 imágenes de prueba, con YOLO11m, corridas en
+la misma máquina (Apple M4 Max) y medidas con el mismo evaluador, `tools/eval_radial.py`
+(`notebooks/comparacion_2x2.ipynb`). Anillos por ángulo de incidencia θ:
+
+| rama | mAP@50 | mAP@50-95 | centro | medio | periferia | caída | latencia |
+|---|---|---|---|---|---|---|---|
+| 1 — sin rectificar ni entrenar | 0,378 | 0,239 | 0,541 | 0,432 | 0,170 | 69% | 25,0 ms |
+| 2 — proyección cilíndrica | 0,418 | 0,155 | 0,528 | 0,420 | 0,316 | 40% | 26,6 ms |
+| 3 — fine-tuning | **0,659** | **0,430** | **0,701** | **0,670** | **0,603** | **14%** | 22,9 ms |
+| 4 — cilíndrica + fine-tuning | 0,522 | 0,172 | 0,642 | 0,522 | 0,412 | 36% | 28,6 ms |
+
+Centro, medio y periferia son mAP@50; la caída es del centro a la periferia.
+Efectos sobre el mAP@50, como diferencias entre celdas que cambian un solo factor:
+
+| efecto | global | periferia |
+|---|---|---|
+| rectificar sin fine-tuning (2 − 1) | +0,041 | +0,147 |
+| rectificar con fine-tuning (4 − 3) | −0,138 | −0,191 |
+| fine-tuning sin rectificar (3 − 1) | +0,282 | +0,433 |
+| fine-tuning con rectificar (4 − 2) | +0,104 | +0,096 |
+| interacción (4 − 3) − (2 − 1) | −0,178 | −0,337 |
+
+El fine-tuning es el factor dominante: lleva la periferia de 0,170 a 0,603 y deja la
+caída del centro a la periferia en 14%. La interacción es negativa y grande:
+rectificar ayuda al detector sin entrenar, pero perjudica al entrenado. La pérdida de
+las ramas rectificadas se concentra en mAP@50-95, porque la caja que vuelve de la
+cilíndrica a la fisheye encierra un contorno curvo y queda más grande que el objeto
+(aun con una detección perfecta, la IoU mediana es 0,65 en el anillo medio y la
+periferia), y porque los objetos fuera de la banda no se pueden detectar. Las
+conclusiones no dependen de cómo se definan los anillos: la interacción en la
+periferia es −0,339 con el filtrado por anillo de `fisheye_utils` (el que usan los
+notebooks) y −0,354 con anillos por radio normalizado.
+
+La proyección y la vuelta de las cajas suman unos 3 ms por imagen; el fine-tuning no
+agrega costo, porque es el mismo modelo con otros pesos. Las latencias son de una
+misma sesión: el valor absoluto del detector varía entre sesiones (17 ms en la
+sección 5), pero no la diferencia entre ramas.
+
+**Limitaciones.** Una corrida por rama, sin varianza entre semillas. La comparación
+se hace en la fisheye y con cajas; con contornos o máscaras, las ramas rectificadas
+podrían perder menos. Los notebooks reportan el esquema de filtrado de
+`fisheye_utils`, que da valores hasta 0,03 menores por anillo que `eval_radial.py`
+con las mismas conclusiones.
+
+---
+
+## 7. Estructura del repositorio
 
 ```
 notebooks/
@@ -201,6 +250,7 @@ notebooks/
     rama3_finetune.ipynb          fine-tuning sobre fisheye: evaluación en val y test
     rama3_colab.ipynb             entrenamiento de la rama 3 en Google Colab (GPU)
     rama4_cilindrica_finetune.ipynb
+    comparacion_2x2.ipynb         las cuatro ramas con el mismo evaluador y la misma máquina
 fisheye_utils.py                  funciones compartidas: carga del test, proyección
                                   cilíndrica, detectores COCO y mAP por anillo (radio o θ)
 fisheye_aug.py                    rama 3: armado del dataset YOLO, entrenamiento y
@@ -215,6 +265,10 @@ tools/
     make_drive_package.py         paquete del test para el Drive, sin recomprimir
     inspect_annotations.py        inspección del esquema de anotaciones
     train_rama3.py                entrenamiento de la rama 3 desde la terminal
+    eval_radial.py                mAP global y por anillo de θ con el esquema de COCO
+    validar_eval_radial.py        compara eval_radial.py contra pycocotools
+    predict_baseline.py           inferencia y latencia de las ramas 1 y 2
+    build_calibration.py          consolidación de la calibración de Valeo
 config/
     class_map.json                WoodScape -> 3 clases
     coco_map.json                 COCO -> 3 clases
@@ -229,16 +283,21 @@ outputs/                          predicciones, métricas y figuras (no versiona
 vpc2_fisheye.png                  diagrama del trabajo
 ```
 
-Todavía no están en el repo `eval_radial.py` (mAP por θ con el esquema *ignore*),
-`predict_baseline.py` (inferencia y latencia de las ramas 1 y 2) ni
-`build_calibration.py` (consolidación de la calibración de Valeo). Los notebooks y
-`fisheye_utils.py` esperan además la carpeta `CV2/` del Drive del equipo, con el
+`eval_radial.py`, `predict_baseline.py` y `build_calibration.py` son
+reconstrucciones: los originales del equipo no quedaron en el repo. `eval_radial.py`
+replica `pycocotools` con θ en lugar del área y coincide con él en todos los anillos
+(`validar_eval_radial.py`: diferencia máxima de 1e-16 sobre las predicciones de las
+ramas 1 y 3) y reproduce los números del original en la rama 4 (diferencias de
+0,001 como máximo, el redondeo con que se reportaron). `predict_baseline.py` reproduce las predicciones del notebook de la
+rama 1 (las mismas cajas) y `build_calibration.py` regenera `config/calibration.json`
+byte a byte desde las calibraciones de Valeo. Los notebooks y `fisheye_utils.py` esperan además
+la carpeta `CV2/` del Drive del equipo, con el
 test, la calibración, el manifest y `Scripts/convert_to_yolo.py` (ver
 `GUIA_EQUIPO.md`).
 
 ---
 
-## 7. Reproducibilidad
+## 8. Reproducibilidad
 
 **Requisitos:** Python `>=3.11,<3.13` y [uv](https://docs.astral.sh/uv/).
 
@@ -267,11 +326,10 @@ indica una versión diferente de `class_map.json`.
 
 Las ramas 1 y 2 no entrenan: la inferencia con YOLO11m de COCO y las métricas
 están dentro de `notebooks/rama1_baseline.ipynb` y `notebooks/rama2_cilindrica.ipynb`.
-Los mismos pasos por scripts, cuando `predict_baseline.py` y `eval_radial.py` estén
-en `tools/`:
+Los mismos pasos se pueden correr por scripts:
 
 ```bash
-# Inferencia con modelo preentrenado (ramas 1 y 2)
+# Inferencia con modelo preentrenado (rama 1; con --proyeccion cilindrica, la rama 2)
 uv run python tools/predict_baseline.py --yolo-dir outputs/yolo_ds \
     --modelo yolo11m.pt --out outputs/pred/rama1 --coco-map config/coco_map.json
 
@@ -280,6 +338,10 @@ uv run python tools/eval_radial.py --yolo-dir outputs/yolo_ds \
     --pred-json outputs/pred/rama1/pred.json --out outputs/resultados/rama1 \
     --calibration config/calibration.json --rings-file config/rings.json \
     --cruce-tamano --etiqueta rama1
+
+# Control del evaluador contra pycocotools (no es dependencia del proyecto)
+uv run --with pycocotools python tools/validar_eval_radial.py --yolo-dir outputs/yolo_ds \
+    --pred-json outputs/pred/rama1/pred.json --metricas outputs/resultados/rama1/metricas.json
 
 # Fine-tuning sobre las fisheye sin rectificar (rama 3), 30 épocas.
 # --device mps en Mac o --device 0 con GPU NVIDIA; --variante radial entrena la extensión.
@@ -316,7 +378,7 @@ idéntico.
 
 ---
 
-## 8. Licencia y atribución
+## 9. Licencia y atribución
 
 Este trabajo utiliza el **Valeo WoodScape Dataset**, cuyos términos de uso
 restringen su empleo a fines de investigación, docencia y experimentación
