@@ -103,8 +103,13 @@ uv sync
 Preparar los datos:
 
 ```bash
-# 1. Descargar WoodScape de Kaggle (subarnadasgupta/woodscapes) y descomprimir.
-#    Debe quedar <raiz>/rgb_images y <raiz>/instance_annotations
+# 1. Descargar la carpeta CV2/ del Drive del equipo y dejarla en la raíz del repo:
+#    https://drive.google.com/drive/folders/1Lu6oGsKqbPjERQKhMCfpQjAXET4tPYzV
+#    Trae las 1000 imágenes de prueba, la partición y la calibración. Alcanza para
+#    evaluar con los pesos incluidos.
+#    Para entrenar hacen falta además las imágenes de entrenamiento, que salen de
+#    Kaggle (subarnadasgupta/woodscapes). Al descomprimir debe quedar
+#    <raiz>/rgb_images y <raiz>/instance_annotations
 
 # 2. Verificar que la copia local coincide con la partición
 uv run python tools/verify_split.py --root <raiz> --split-dir splits/
