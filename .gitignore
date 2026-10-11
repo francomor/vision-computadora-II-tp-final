@@ -10,3 +10,8 @@ CV2/
 # dataset local (se baja de Kaggle, no se versiona)
 rgb_images/
 instance_annotations/
+
+# basura de Jupyter y Anaconda, y un clon del repo adentro del repo
+.virtual_documents/
+anaconda_projects/
+/vision-computadora-II-tp-final/

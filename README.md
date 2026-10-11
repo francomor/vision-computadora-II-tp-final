@@ -205,13 +205,14 @@ fisheye_utils.py                  funciones compartidas: carga del test, proyecc
                                   cilíndrica, detectores COCO y mAP por anillo (radio o θ)
 fisheye_aug.py                    rama 3: armado del dataset YOLO, entrenamiento y
                                   augmentación de distorsión radial
+finetune_utils.py                 rama 4: dataset cilíndrico (proyecta los polígonos),
+                                  fine-tuning e inferencia sobre el test
+entrenar_finetune.py              rama 4 de punta a punta desde la terminal
 tools/
     make_test_split.py            partición con auditoría de casi-duplicados
     verify_split.py               verificación por sha256 de una copia local
     convert_to_yolo.py            polígonos de instancia a cajas YOLO
-    build_calibration.py          consolidación de la calibración de Valeo
-    predict_baseline.py           inferencia y medición de latencia
-    eval_radial.py                mAP global y estratificado por θ
+    make_drive_package.py         paquete del test para el Drive, sin recomprimir
     inspect_annotations.py        inspección del esquema de anotaciones
     train_rama3.py                entrenamiento de la rama 3 desde la terminal
 config/
@@ -227,6 +228,13 @@ splits/
 outputs/                          predicciones, métricas y figuras (no versionado)
 vpc2_fisheye.png                  diagrama del trabajo
 ```
+
+Todavía no están en el repo `eval_radial.py` (mAP por θ con el esquema *ignore*),
+`predict_baseline.py` (inferencia y latencia de las ramas 1 y 2) ni
+`build_calibration.py` (consolidación de la calibración de Valeo). Los notebooks y
+`fisheye_utils.py` esperan además la carpeta `CV2/` del Drive del equipo, con el
+test, la calibración, el manifest y `Scripts/convert_to_yolo.py` (ver
+`GUIA_EQUIPO.md`).
 
 ---
 
@@ -257,6 +265,11 @@ indica una versión diferente de `class_map.json`.
 
 ### Reproducir una rama
 
+Las ramas 1 y 2 no entrenan: la inferencia con YOLO11m de COCO y las métricas
+están dentro de `notebooks/rama1_baseline.ipynb` y `notebooks/rama2_cilindrica.ipynb`.
+Los mismos pasos por scripts, cuando `predict_baseline.py` y `eval_radial.py` estén
+en `tools/`:
+
 ```bash
 # Inferencia con modelo preentrenado (ramas 1 y 2)
 uv run python tools/predict_baseline.py --yolo-dir outputs/yolo_ds \
@@ -273,6 +286,9 @@ uv run python tools/eval_radial.py --yolo-dir outputs/yolo_ds \
 uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
     --imagenes <raiz>/rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
     --modelo yolo11m.pt --cache ram
+
+# Dataset cilíndrico, fine-tuning y test de la rama 4 (lee las listas de CV2/yolo_ds).
+uv run python entrenar_finetune.py --modelos yolo11n yolo11s yolo11m
 ```
 
 **Rama 3.** `fisheye_aug.py` arma la estructura `images/` + `labels/` que espera
@@ -284,6 +300,15 @@ r_src = r·(1 + k·r²)/(1 + k) con k ~ U[−0,2; 0,3] y p = 0,5, aplicada antes
 local se puede entrenar en Colab con `notebooks/rama3_colab.ipynb`. La evaluación
 (val y test, por anillo, cámara y clase) y el fundamento teórico están en
 `notebooks/rama3_finetune.ipynb`.
+
+**Rama 4.** `entrenar_finetune.py` proyecta las imágenes a la cilíndrica de la rama 2
+y lleva las etiquetas proyectando el polígono de cada objeto (no su caja, que se
+inflaría en la periferia). Después entrena con `finetune_utils.py` y evalúa cada
+modelo sobre el test apenas termina. `notebooks/rama4_cilindrica_finetune.ipynb` no
+entrena: levanta lo que deja el script. Usa los mismos valores de entrenamiento que
+la rama 3 (YOLO11m desde COCO, 30 épocas, `imgsz=640`, batch nominal 64, mismo
+optimizador y criterio de checkpoint), salvo el batch físico (2, por la memoria de
+la GPU) y la semilla.
 
 La partición se puede regenerar desde cero con `tools/make_test_split.py`
 usando la semilla registrada en `splits/split_config.json`; el resultado es

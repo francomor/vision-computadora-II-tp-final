@@ -179,17 +179,32 @@ van a dar distintos y tu tabla no se va a poder comparar. Los congelados son
 En el `10` editá `MODELO=yolo11m.pt` y `OUT`. En el `09`, `PRED_JSON`, `OUT` y
 `ETIQUETA`.
 
-### Ramas 3 y 4 (con fine-tuning)
-
-Entrenás con Ultralytics apuntando al `data.yaml` que generó el `07`:
+### Rama 3 (fine-tuning sin rectificar)
 
 ```
-yolo detect train model=yolo11m.pt data=yolo_ds\data.yaml imgsz=640 epochs=<N>
+uv run python tools/train_rama3.py --variante base --epochs 30 --device mps \
+    --imagenes <raiz>/rgb_images --ds outputs/rama3/yolo_ds --salida outputs/rama3/mac \
+    --modelo yolo11m.pt --cache ram
 ```
 
-Elegís checkpoint por mAP@50-95 de validación. Después generás predicciones
-sobre el test con `--save-txt --save-conf` y en el `09` dejás `PRED_JSON` vacío
-y completás `PRED_DIR` con la carpeta `labels` que produce.
+Con GPU NVIDIA, `--device 0`; sin GPU local, `notebooks/rama3_colab.ipynb`. La
+evaluación sobre validación y test está en `notebooks/rama3_finetune.ipynb`.
+
+### Rama 4 (cilíndrica + fine-tuning)
+
+```
+uv run python entrenar_finetune.py --modelos yolo11n yolo11s yolo11m
+```
+
+Arma el dataset cilíndrico, entrena y predice sobre el test apenas termina cada
+modelo. `notebooks/rama4_cilindrica_finetune.ipynb` levanta los resultados. No usen
+`--rama 3`: es una alternativa que no se usó y escribe en la carpeta de la rama 3.
+
+Las dos ramas eligen el checkpoint por mAP@50-95 de validación (es el `fitness` de
+Ultralytics 8.4) y entrenan con los mismos valores: YOLO11m desde COCO, 30 épocas,
+`imgsz=640` y batch nominal 64. Solo cambian el batch físico (16 en la rama 3, 2 en
+la 4, por memoria) y la semilla. Para pasar las predicciones de test al `09`, se
+exportan a JSON con `finetune_utils.a_pred_json`.
 
 Podés correr el `09` sobre validación todas las veces que quieras durante el
 desarrollo, con `--split val`. El test queda intacto hasta el final.
@@ -280,7 +295,13 @@ resultado es que tu estrategia no ataca el problema que estudiamos.
 ## 10. Pendientes del equipo
 
 - **Latencia**: la mide una sola persona, en una sola máquina, para las cuatro
-  ramas. Medida en GPUs distintas no va en la misma tabla.
+  ramas. Medida en GPUs distintas no va en la misma tabla. Las ramas 1 y 3 ya
+  están medidas en la Mac de Marcos (M4 Max); faltan la 2 y la 4 en esa máquina.
+- **θ con un solo evaluador**: la rama 1 usa `evaluar(por="theta")` de
+  `fisheye_utils` y la rama 4 usa `eval_radial.py`, que marca como *ignore* los
+  objetos de otros anillos en vez de filtrarlos. Para la tabla del paper las
+  cuatro ramas se miden con el mismo. `eval_radial.py`, `predict_baseline.py` y
+  `build_calibration.py` todavía no están en el repo.
 - **`two_wheeler` rinde bajo en todos los anillos** (AP@50 0,19 contra 0,51 de
   `vehicle`). Conviene revisar si influye que `rider` esté mapeado a `person`:
   una moto con conductor genera dos cajas superpuestas en la referencia.
