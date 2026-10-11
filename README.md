@@ -9,8 +9,7 @@ Integrantes:
 - Marcos Levi Riveros Koloszwa
 - Tadeo Riveros Koloszwa
 
-El paper con el análisis completo está en `paper_ieee/main.tex` y compilado en
-`paper_fisheye_ieee.pdf`.
+El paper con el análisis completo está en `paper_fisheye_ieee.pdf`.
 
 ---
 
@@ -77,6 +76,8 @@ con anotaciones de instancia y calibración por imagen.
 
 - Imágenes y anotaciones: Kaggle, `subarnadasgupta/woodscapes`.
 - Calibración: repositorio oficial de Valeo.
+- Partición, calibración consolidada y las 1000 imágenes de prueba: [carpeta del equipo en
+  Google Drive](https://drive.google.com/drive/folders/1Lu6oGsKqbPjERQKhMCfpQjAXET4tPYzV) (carpeta `CV2/`).
 
 Las 43 etiquetas de WoodScape se agrupan en tres clases (`config/class_map.json`):
 
@@ -150,7 +151,7 @@ Para evaluar sin entrenar, el repositorio incluye los pesos finales:
 | 4 | `outputs/rama4/train/yolo11m/weights/best.pt` |
 
 `notebooks/comparacion_2x2.ipynb` reproduce la tabla de resultados con esos pesos.
-Los notebooks esperan además la carpeta `CV2/` del Drive del equipo (ver
+Los notebooks esperan además la carpeta `CV2/` del [Drive del equipo](https://drive.google.com/drive/folders/1Lu6oGsKqbPjERQKhMCfpQjAXET4tPYzV) (ver
 `GUIA_EQUIPO.md`).
 
 ## 7. Estructura
