@@ -152,16 +152,25 @@ Los notebooks esperan además la carpeta `CV2/` del Drive del equipo (ver
 ## 7. Estructura
 
 ```
-notebooks/            un notebook por rama y comparacion_2x2.ipynb
-fisheye_utils.py      funciones compartidas: carga del test, proyección cilíndrica y mAP por anillo
-fisheye_aug.py        rama 3: dataset YOLO, entrenamiento y aumento de datos con distorsión radial
-finetune_utils.py     rama 4: dataset cilíndrico, fine-tuning e inferencia
-entrenar_finetune.py  rama 4 desde la terminal
-tools/                partición, conversión a YOLO, inferencia y evaluación por anillo
-config/               mapeo de clases, cortes de anillo y calibración
-splits/               listas de la partición y sha256 de cada imagen
-outputs/              predicciones, métricas y pesos finales
-paper_ieee/           paper (main.tex) y script de figuras
+notebooks/              un notebook por rama y comparacion_2x2.ipynb
+fisheye_utils.py        funciones compartidas: carga del test, proyección cilíndrica y mAP por anillo
+fisheye_aug.py          rama 3: dataset YOLO, entrenamiento y aumento de datos con distorsión radial
+finetune_utils.py       rama 4: dataset cilíndrico, fine-tuning e inferencia
+entrenar_finetune.py    rama 4 desde la terminal
+tools/                  partición, conversión a YOLO, inferencia, evaluación por anillo
+                        y su validación contra pycocotools
+config/                 mapeo de clases, cortes de anillo y calibración
+splits/                 listas de la partición, sha256 de cada imagen y auditoría de duplicados
+outputs/                no se versiona, salvo los resultados de la rama 2, los pesos
+                        finales de las ramas 3 y 4 y las curvas de entrenamiento de la rama 3
+paper_ieee/             fuente LaTeX del paper, figuras y script que las genera
+paper_fisheye_ieee.pdf  paper compilado (formato de conferencia IEEE)
+Presentacion.html       presentación del trabajo
+vpc2_fisheye.png        diagrama del diseño 2×2
+DATASET_SPLIT.md        detalle de la partición y la auditoría de fuga de información
+GUIA_EQUIPO.md          guía interna del equipo (carpeta CV2/ del Drive)
+pyproject.toml, uv.lock dependencias
+Pautas_Trabajo_Practico_Final.pdf  consigna de la materia
 ```
 
 ## 8. Licencia
