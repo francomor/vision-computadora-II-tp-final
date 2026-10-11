@@ -2,8 +2,12 @@
 
 Trabajo práctico final de **Visión por Computadora II** (CEIA, FIUBA), grupo 1.
 
-Integrantes: Franco Marcelo Morero, Nicolás Granato, Marcos Levi Riveros Koloszwa y
-Tadeo Riveros Koloszwa.
+Integrantes:
+
+- Franco Marcelo Morero
+- Nicolás Granato
+- Marcos Levi Riveros Koloszwa
+- Tadeo Riveros Koloszwa
 
 El paper con el análisis completo está en `paper_ieee/main.tex` y compilado en
 `paper_fisheye_ieee.pdf`.
