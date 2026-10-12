@@ -337,7 +337,7 @@ async function compararTodos() {
         urlsRes.push(url);
         const h = k => r.headers.get(k);
         Object.assign(fila, {
-          url, conteo: JSON.parse(h("X-Detecciones") || "{}"), confMedia: Number(h("X-Confianza-Media")),
+          url, conteo: JSON.parse(h("X-Detecciones") || "{}"), confMedia: h("X-Confianza-Media") === null ? null : Number(h("X-Confianza-Media")),
           inf: Number(h("X-Latencia-Ms")), total: Number(h("X-Total-Ms")), remap: Number(h("X-Remap-Ms")),
           reproy: Number(h("X-Reproyeccion-Ms")), calib: h("X-Calibracion"),
         });
@@ -369,7 +369,7 @@ function pintar(i, f) {
   const total = Object.values(f.conteo).reduce((a, b) => a + b, 0);
   $(`det-${i}`).innerHTML = (CLASES.filter(k => f.conteo[k]).map(k => `<span class="chip">${k}: ${f.conteo[k]}</span>`)
                              .join("") || "ninguna") + `<br>total ${total}`;
-  $(`conf-${i}`).textContent = total ? f.confMedia.toFixed(2) : "–";
+  $(`conf-${i}`).textContent = total && f.confMedia !== null ? f.confMedia.toFixed(2) : "–";
   $(`t-${i}`).innerHTML = (f.c.proy === "cilindrica"
       ? `inferencia ${f.inf.toFixed(1)} ms<br>remap ${f.remap.toFixed(1)} ms` +
         (vista === "fisheye" ? ` · reproyección ${f.reproy.toFixed(1)} ms` : "") + `<br>total ${f.total.toFixed(1)} ms` +
@@ -384,7 +384,7 @@ function pintarTabla(filas) {
     ? `<tr><td>${f.c.rama}</td><td>${f.c.modelo.nombre}</td><td colspan="7" class="error" style="text-align:left">${f.error}</td></tr>`
     : `<tr><td>${f.c.rama}</td><td>${f.c.modelo.nombre}</td>` +
       CLASES.map(k => `<td>${f.conteo[k] || 0}</td>`).join("") + `<td>${total(f)}</td>` +
-      `<td>${total(f) ? f.confMedia.toFixed(2) : "–"}</td><td>${f.inf.toFixed(1)}</td><td>${f.total.toFixed(1)}</td></tr>`
+      `<td>${total(f) && f.confMedia !== null ? f.confMedia.toFixed(2) : "–"}</td><td>${f.inf.toFixed(1)}</td><td>${f.total.toFixed(1)}</td></tr>`
   ).join("");
 }
 
