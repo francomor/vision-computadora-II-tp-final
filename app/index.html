@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detección fisheye</title>
+<style>
+  :root { --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #667085; --line: #dfe3e8; --accent: #2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --text: #e6e8eb; --muted: #9aa3af; --line: #2e343d; --accent: #60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 1.25rem; margin: 0 0 16px; }
+  .controles { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; background: var(--card);
+               border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  label { font-size: .9rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  select { font: inherit; padding: 4px 6px; }
+  #confv { font-variant-numeric: tabular-nums; color: var(--text); min-width: 2.5em; }
+  #zona { flex: 1; min-width: 220px; border: 2px dashed var(--line); border-radius: 8px; padding: 12px;
+          text-align: center; color: var(--muted); cursor: pointer; }
+  #zona.encima { border-color: var(--accent); color: var(--accent); }
+  #estado { margin: 14px 2px; font-size: .95rem; min-height: 1.4em; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line);
+          margin-left: 6px; font-size: .85rem; }
+  .error { color: #d92d20; }
+  .paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .paneles { grid-template-columns: 1fr; } }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  figcaption { font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  figure img { width: 100%; display: block; border-radius: 6px; }
+  figure img:not([src]) { visibility: hidden; height: 200px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Detección de objetos en imágenes fisheye · YOLO11</h1>
+
+  <div class="controles">
+    <label>Modelo <select id="modelo"></select></label>
+    <label>Confianza <input id="conf" type="range" min="0.05" max="0.9" step="0.05" value="0.25"><span id="confv">0.25</span></label>
+    <div id="zona">Arrastrá una imagen acá o hacé clic para elegirla</div>
+    <input id="archivo" type="file" accept="image/*" hidden>
+  </div>
+
+  <div id="estado"></div>
+
+  <div class="paneles">
+    <figure><figcaption>Original</figcaption><img id="orig" alt="imagen original"></figure>
+    <figure><figcaption>Detecciones</figcaption><img id="res" alt="imagen con detecciones"></figure>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let archivo = null;
+let urlOrig = null, urlRes = null;
+
+async function cargarModelos() {
+  const d = await (await fetch("/modelos")).json();
+  for (const m of d.modelos) {
+    const o = new Option(`${m.nombre} · ${m.descripcion}${m.disponible ? "" : " (sin pesos)"}`, m.nombre);
+    o.disabled = !m.disponible;
+    $("modelo").add(o);
+  }
+  const elegido = d.modelos.find(m => m.disponible && m.nombre !== "coco") || d.modelos.find(m => m.disponible);
+  if (elegido) $("modelo").value = elegido.nombre;
+  $("estado").textContent = `device: ${d.device} · imgsz: ${d.imgsz}`;
+}
+
+function elegir(f) {
+  if (!f || !f.type.startsWith("image/")) return;
+  archivo = f;
+  if (urlOrig) URL.revokeObjectURL(urlOrig);
+  urlOrig = URL.createObjectURL(f);
+  $("orig").src = urlOrig;
+  detectar();
+}
+
+async function detectar() {
+  if (!archivo) return;
+  const fd = new FormData();
+  fd.append("imagen", archivo);
+  fd.append("modelo", $("modelo").value);
+  fd.append("conf", $("conf").value);
+  $("estado").textContent = "Detectando… (la primera vez con cada modelo tarda más porque lo carga)";
+  try {
+    const r = await fetch("/detectar", { method: "POST", body: fd });
+    if (!r.ok) {
+      let msg = r.statusText;
+      try { msg = (await r.json()).detail; } catch {}
+      throw new Error(msg);
+    }
+    if (urlRes) URL.revokeObjectURL(urlRes);
+    urlRes = URL.createObjectURL(await r.blob());
+    $("res").src = urlRes;
+    const conteo = JSON.parse(r.headers.get("X-Detecciones") || "{}");
+    const chips = Object.entries(conteo).map(([k, v]) => `<span class="chip">${k}: ${v}</span>`).join("")
+                  || '<span class="chip">sin detecciones</span>';
+    $("estado").innerHTML = `<b>${$("modelo").value}</b> · inferencia ${r.headers.get("X-Latencia-Ms")} ms ` +
+                            `(total ${r.headers.get("X-Total-Ms")} ms) ${chips}`;
+  } catch (e) {
+    $("estado").innerHTML = `<span class="error">Error: ${e.message}</span>`;
+  }
+}
+
+$("zona").onclick = () => $("archivo").click();
+$("archivo").onchange = e => elegir(e.target.files[0]);
+$("zona").ondragover = e => { e.preventDefault(); $("zona").classList.add("encima"); };
+$("zona").ondragleave = () => $("zona").classList.remove("encima");
+$("zona").ondrop = e => { e.preventDefault(); $("zona").classList.remove("encima"); elegir(e.dataTransfer.files[0]); };
+$("modelo").onchange = detectar;                       // cambiar de modelo vuelve a detectar la misma imagen
+$("conf").oninput = () => $("confv").textContent = Number($("conf").value).toFixed(2);
+$("conf").onchange = detectar;
+
+cargarModelos().catch(e => $("estado").innerHTML = `<span class="error">No pude leer /modelos: ${e.message}</span>`);
+</script>
+</body>
+</html>

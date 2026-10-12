@@ -16,6 +16,9 @@ dependencies = [
     "ipykernel",
     "jupyterlab",
     "nbconvert",
+    "fastapi>=0.143.0",
+    "uvicorn[standard]>=0.54.0",
+    "python-multipart>=0.0.32",
 ]
 
 # en Windows, torch y torchvision con CUDA; en Mac y Linux no cambia nada
