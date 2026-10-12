@@ -21,6 +21,8 @@ Video en vivo (GET /en_vivo): reproduce un video de outputs/videos/ como si fuer
 toca lo decide el reloj de la camara: si el pipeline tarda mas que un frame, los que pasaron se descartan. Devuelve
 un stream MJPEG con las detecciones y los fps, la latencia y los descartes dibujados arriba. Los videos del test
 se arman con tools/hacer_video.py, que deja al lado un json con la imagen de cada frame para usar su calibracion.
+Con fuente=pantalla la camara es una region de la pantalla (por ejemplo un video de YouTube reproduciendose en otra
+ventana): necesita `uv add mss` y, en la Mac, darle a la terminal el permiso de Grabacion de pantalla.
 
 coco + fisheye es la rama 1, coco + cilindrica la rama 2, base y radial la rama 3 y cilindrica la rama 4.
 La augmentacion radial es de entrenamiento, asi que base y radial se usan igual aca.
@@ -243,6 +245,7 @@ def detectar_en(img, modelo, conf, proyeccion, clave=None, vista="fisheye"):
     clases = np.array([COCO_A_EQUIPO.get(m.names[c], m.names[c]) for c in r.boxes.cls.int().tolist()])
     if cil and vista == "cilindrica":
         salida, conteo = dibujar(entrada, cajas, clases, confs)
+        dibujadas = confs
     elif cil:
         intr = json.loads(clave)["intrinsic"]
         t0 = time.perf_counter()
@@ -250,8 +253,11 @@ def detectar_en(img, modelo, conf, proyeccion, clave=None, vista="fisheye"):
         fish, ok = fu.caja_a_fisheye(cajas, mx, my, int(intr["width"]), int(intr["height"]))
         t["reproyeccion"] = 1e3 * (time.perf_counter() - t0)
         salida, conteo = dibujar(marcar_zona(img, zona_cilindrica(clave)), fish[ok], clases[ok], confs[ok])
+        dibujadas = confs[ok]
     else:
         salida, conteo = dibujar(img, cajas, clases, confs)
+        dibujadas = confs
+    t["conf_media"] = float(dibujadas.mean()) if len(dibujadas) else 0.0
     v = r.speed  # ms: preprocess, inference, postprocess (los de ultralytics)
     t["inferencia"] = v["inference"]
     t["total"] = t["remap"] + v["preprocess"] + v["inference"] + v["postprocess"] + t["reproyeccion"]
@@ -303,6 +309,66 @@ class CamaraSimulada:
 
     def cerrar(self):
         self.cap.release()
+
+
+_mss = threading.local()  # mss no se comparte entre hilos y el threadpool usa varios
+
+
+def captura_pantalla(region):
+    """bgr de una region {left, top, width, height} de la pantalla (en puntos; en retina sale al doble)"""
+    try:
+        import mss
+    except ImportError:
+        raise HTTPException(503, "la captura de pantalla necesita mss: corré `uv add mss` en la raíz del repo")
+    if not hasattr(_mss, "sct"):
+        _mss.sct = mss.mss()
+    img = np.asarray(_mss.sct.grab(region))[:, :, :3]  # bgra -> bgr
+    return np.ascontiguousarray(img)
+
+
+def monitores():
+    try:
+        captura_pantalla({"left": 0, "top": 0, "width": 1, "height": 1})  # crea el mss del hilo o avisa que falta
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"no pude capturar la pantalla: {e}")
+    return [{"left": m["left"], "top": m["top"], "width": m["width"], "height": m["height"]}
+            for m in _mss.sct.monitors[1:]]
+
+
+class CamaraPantalla(CamaraSimulada):
+    """una region de la pantalla como camara: lo que se vea ahi (un video de YouTube, por ejemplo) es el frame.
+
+    Usa el mismo reloj que CamaraSimulada: los frames que la pantalla mostro mientras el modelo trabajaba (a los fps
+    elegidos) cuentan como descartados. Las capturas grandes (retina) se achican a 1280 de ancho.
+    """
+
+    def __init__(self, region, fps=0):
+        if region["width"] < 16 or region["height"] < 16:
+            raise HTTPException(400, "elegí una región de la pantalla con «Elegir región»")
+        self.region = region
+        self.fps = fps or 30
+        self.i = self.reloj = -1
+        self.t0 = None
+        try:
+            self.tam = captura_pantalla(region).shape[:2]  # de paso verifica que se pueda capturar
+        except HTTPException:
+            raise
+        except Exception as e:  # mss: region fuera de la pantalla, sin permiso, sin display
+            raise HTTPException(503, f"no pude capturar la pantalla: {e}")
+
+    def _avanzar(self, leer):
+        self.i += 1
+        if not leer:
+            return None  # una pantalla no guarda los frames que pasaron: solo se cuentan
+        img = captura_pantalla(self.region)
+        if img.shape[1] > 1280:
+            img = cv2.resize(img, (1280, round(img.shape[0] * 1280 / img.shape[1])), interpolation=cv2.INTER_AREA)
+        return img
+
+    def cerrar(self):
+        pass
 
 
 class Medidor:
@@ -388,14 +454,22 @@ def meta_video(ruta):
 _vivo = {"id": 0, "estado": {}}  # una transmision por vez: la nueva corta la anterior
 
 
-async def _transmitir(request, mi_id, video, modelo, conf, proyeccion, camara, vista, fps):
+async def _transmitir(request, mi_id, video, region, modelo, conf, proyeccion, camara, vista, fps):
+    """region None: el video de outputs/videos; si no, esa region de la pantalla"""
     cam = None
     try:
         try:
             proyeccion = validar(modelo, proyeccion)
-            ruta = ruta_video(video)
-            meta = meta_video(ruta)
-            cam = CamaraSimulada(ruta, fps)
+            if region is not None:
+                if proyeccion == "cilindrica":
+                    raise HTTPException(400, "la proyección cilíndrica necesita la calibración de las cámaras de "
+                                             "WoodScape: con la pantalla usá un modelo sin preprocesar (ramas 1 y 3)")
+                cam = await run_in_threadpool(CamaraPantalla, region, fps)
+                video, meta = f"pantalla {region['width']}x{region['height']}", None
+            else:
+                ruta = ruta_video(video)
+                meta = meta_video(ruta)
+                cam = CamaraSimulada(ruta, fps)
             stems, repetir = (meta["stems"], meta.get("repetir", 1)) if meta else (None, 1)
             claves = {}
             if proyeccion == "cilindrica":  # una calibracion por imagen si hay json, si no la de la camara elegida
@@ -488,6 +562,7 @@ def detectar(imagen: UploadFile = File(...), modelo: str = Form("base"), conf: f
         "X-Reproyeccion-Ms": f"{t['reproyeccion']:.1f}",
         "X-Total-Ms": f"{t['total']:.1f}",
         "X-Detecciones": json.dumps(conteo),
+        "X-Confianza-Media": f"{t['conf_media']:.3f}",
     })
     return Response(jpg.tobytes(), media_type="image/jpeg", headers=headers)
 
@@ -523,11 +598,30 @@ def subir_video(video: UploadFile = File(...)):
     return {"nombre": destino.name}
 
 
+@app.get("/pantalla/monitores")
+def pantalla_monitores():
+    return {"monitores": monitores()}
+
+
+@app.get("/pantalla/captura")
+def pantalla_captura(monitor: int = 1):
+    """una captura de un monitor entero, para elegir la region en la pagina"""
+    lista = monitores()
+    if not 1 <= monitor <= len(lista):
+        raise HTTPException(404, f"no hay monitor {monitor}; hay {len(lista)}")
+    img = captura_pantalla(lista[monitor - 1])
+    _, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    return Response(jpg.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/en_vivo")
-async def en_vivo(request: Request, video: str, modelo: str = "base", conf: float = 0.25, proyeccion: str = "",
-                  camara: str = "auto", vista: str = "fisheye", fps: float = 0):
+async def en_vivo(request: Request, video: str = "", modelo: str = "base", conf: float = 0.25, proyeccion: str = "",
+                  camara: str = "auto", vista: str = "fisheye", fps: float = 0, fuente: str = "video",
+                  x: int = 0, y: int = 0, w: int = 0, h: int = 0):
+    """fuente=video usa outputs/videos/<video>; fuente=pantalla captura la region x, y, w, h (en puntos)"""
+    region = {"left": x, "top": y, "width": w, "height": h} if fuente == "pantalla" else None
     _vivo["id"] += 1
-    gen = _transmitir(request, _vivo["id"], video, modelo, conf, proyeccion, camara, vista, fps)
+    gen = _transmitir(request, _vivo["id"], video, region, modelo, conf, proyeccion, camara, vista, fps)
     return StreamingResponse(gen, media_type="multipart/x-mixed-replace; boundary=frame",
                              headers={"Cache-Control": "no-store"})
 
