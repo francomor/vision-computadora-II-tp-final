@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detección fisheye</title>
+<style>
+  :root { --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #667085; --line: #dfe3e8; --accent: #2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --text: #e6e8eb; --muted: #9aa3af; --line: #2e343d; --accent: #60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 1600px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 1.25rem; margin: 0 0 16px; }
+  .controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; background: var(--card);
+               border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .fila { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; width: 100%; }
+  label { font-size: .9rem; color: var(--muted); display: flex; gap: 8px; align-items: center; max-width: 100%; }
+  select { font: inherit; padding: 4px 6px; min-width: 0; max-width: 100%; }
+  #confv { font-variant-numeric: tabular-nums; color: var(--text); min-width: 2.5em; }
+  .segmentado { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .segmentado button { font: inherit; font-size: .85rem; border: 0; padding: 4px 10px; cursor: pointer;
+                       background: transparent; color: var(--muted); }
+  .segmentado button.activo { background: var(--accent); color: #fff; }
+  .solo-cil[hidden] { display: none; }
+
+  .pestanas { display: flex; gap: 4px; margin: 18px 0 0; border-bottom: 1px solid var(--line); }
+  .pestanas button { font: inherit; font-size: .95rem; border: 0; background: none; color: var(--muted);
+                     padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .pestanas button.activo { color: var(--text); border-bottom-color: var(--accent); }
+  .panel { padding-top: 14px; }
+  .panel[hidden] { display: none; }
+
+  #zona { border: 2px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center;
+          color: var(--muted); cursor: pointer; background: var(--card); }
+  #zona.encima { border-color: var(--accent); color: var(--accent); }
+  .boton { font: inherit; font-size: .9rem; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .boton.primario { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .boton:disabled { opacity: .5; cursor: default; }
+
+  .estado { margin: 14px 2px 4px; font-size: .95rem; min-height: 1.4em; line-height: 1.8; }
+  .nota { margin: 0 2px 14px; font-size: .85rem; color: var(--muted); min-height: 1.2em; }
+  .chip { display: inline-block; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--line);
+          margin-left: 6px; font-size: .85rem; white-space: nowrap; }
+  .rama { border-color: var(--accent); color: var(--accent); }
+  .fuera { border-color: #d97706; color: #d97706; }
+  .error { color: #d92d20; }
+  .paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .paneles { grid-template-columns: 1fr; } }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  figcaption { font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  figure img { width: 100%; display: block; border-radius: 6px; }
+  figure img:not([src]) { visibility: hidden; height: 200px; }
+  .solo-tab-video[hidden], #fila-cil[hidden], .cabecera[hidden] { display: none; }
+  .cabecera { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 16px; align-items: start;
+              margin-bottom: 16px; }
+  .tabla-caja { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+                overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 7px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+  th { color: var(--muted); font-weight: 500; white-space: normal; vertical-align: bottom; }
+  tr:last-child td { border-bottom: 0; }
+  #resultados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1100px) { #resultados { grid-template-columns: 1fr; } }
+  .resultado img { cursor: zoom-in; }
+  .resultado { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start;
+               background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+               font-size: .9rem; }
+  .resultado img { width: 100%; display: block; border-radius: 6px; }
+  .resultado .vacia { aspect-ratio: 1280 / 966; border-radius: 6px; background: var(--bg); display: flex;
+                      align-items: center; justify-content: center; color: var(--muted); font-size: .9rem; }
+  .texto h3 { margin: 2px 0 10px; font-size: 1.05rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .texto dl { margin: 0; font-size: .9rem; }
+  .texto dt { color: var(--muted); font-size: .78rem; margin-top: 8px; }
+  .texto dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; line-height: 1.6; }
+  .texto .chip { margin: 0 6px 0 0; }
+  @media (max-width: 800px) { .cabecera, .resultado { grid-template-columns: 1fr; } }
+  .fila-in { display: inline-flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+  .fila-in[hidden], .nota[hidden] { display: none; }
+  #selector { margin-bottom: 14px; }
+  #selector[hidden] { display: none; }
+  #selector-lienzo { position: relative; user-select: none; cursor: crosshair; border: 1px solid var(--line);
+                     border-radius: 6px; overflow: hidden; }
+  #selector-lienzo img { width: 100%; display: block; pointer-events: none; }
+  #marco { position: absolute; border: 2px solid #f59e0b; background: rgba(245, 158, 11, .15); display: none; }
+  #vivo-fig { max-width: 896px; margin: 0 auto; }  /* el reproductor: 70% de los 1280 px que ocupaba antes */
+  @media (max-width: 800px) { #vivo-fig { max-width: 100%; } }
+  #vivo-fig img:not([src]) { visibility: visible; height: auto; aspect-ratio: 1280 / 966; background: #0b0d10; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Detección de objetos en imágenes fisheye · YOLO11</h1>
+
+  <div class="controles">
+    <div class="fila">
+      <label class="solo-tab-video">Modelo <select id="modelo"></select></label>
+      <label class="solo-tab-video">Preprocesamiento
+        <select id="proyeccion">
+          <option value="fisheye">ninguno, imagen fisheye</option>
+          <option value="cilindrica">proyección cilíndrica (rama 2)</option>
+        </select>
+      </label>
+      <label>Confianza <input id="conf" type="range" min="0.05" max="0.9" step="0.05" value="0.25"><span id="confv">0.25</span></label>
+    </div>
+    <div class="fila" id="fila-cil" hidden>
+      <label>Cámara
+        <select id="camara"><option value="auto">automática (del nombre del archivo)</option></select>
+      </label>
+      <label>Ver cajas en
+        <span class="segmentado" id="vista">
+          <button type="button" data-vista="fisheye" class="activo">fisheye</button>
+          <button type="button" data-vista="cilindrica">cilíndrica</button>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="pestanas">
+    <button type="button" data-panel="imagen" class="activo">Imagen</button>
+    <button type="button" data-panel="video">Video en vivo</button>
+  </div>
+
+  <section class="panel" id="panel-imagen">
+    <div id="zona">Arrastrá una imagen acá o hacé clic para elegirla</div>
+    <input id="archivo" type="file" accept="image/*" hidden>
+    <div class="estado" id="estado"></div>
+    <div class="nota">Se corren todas las combinaciones del diseño 2×2 sobre la misma imagen. La cámara y la vista de arriba
+      se usan en las que llevan proyección cilíndrica (ramas 2 y 4); en esas, lo oscurecido queda fuera de la banda de ±45° que ve el modelo.</div>
+    <div class="cabecera" id="cabecera" hidden>
+      <figure><figcaption id="titulo-orig">Original</figcaption><img id="orig" alt="imagen original"></figure>
+      <div class="tabla-caja">
+        <table id="tabla">
+          <thead><tr><th>rama</th><th>modelo</th><th>vehicle</th><th>person</th><th>two_wheeler</th><th>total</th>
+            <th>conf. media</th><th>inferencia (ms)</th><th>total (ms)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="nota">Clic en una imagen para verla en tamaño completo. Mismo umbral de confianza para todos. Los tiempos son de esta máquina; la primera corrida de cada
+          modelo incluye la carga.</div>
+      </div>
+    </div>
+    <div id="resultados"></div>
+  </section>
+
+  <section class="panel" id="panel-video" hidden>
+    <div class="controles">
+      <div class="fila">
+        <label>Fuente
+          <select id="fuente">
+            <option value="video">archivo de video</option>
+            <option value="pantalla">región de la pantalla</option>
+          </select>
+        </label>
+        <span class="solo-video fila-in">
+          <label>Video <select id="video"></select></label>
+          <button type="button" class="boton" id="subir">Subir otro…</button>
+          <input id="archivo-video" type="file" accept="video/*" hidden>
+        </span>
+        <span class="solo-pantalla fila-in" hidden>
+          <label>Monitor <select id="monitor"></select></label>
+          <button type="button" class="boton" id="elegir-region">Elegir región…</button>
+          <span class="chip" id="region-txt">sin región</span>
+        </span>
+        <label>Ritmo de la cámara
+          <select id="fps">
+            <option value="0">los fps del video</option>
+            <option value="10">10 fps</option>
+            <option value="15">15 fps</option>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </label>
+        <button type="button" class="boton primario" id="iniciar">Iniciar</button>
+      </div>
+    </div>
+    <div class="estado" id="estado-video"></div>
+    <div class="nota solo-video">Los frames llegan al ritmo de la cámara: si el modelo tarda más que un frame, los que pasaron se descartan.
+      Las imágenes de WoodScape no son consecutivas, así que cada escena es distinta.</div>
+    <div class="nota solo-pantalla" hidden>Reproducí el video en otra ventana, elegí su región y tocá Iniciar. Esta página no puede quedar
+      adentro de la región (se capturaría a sí misma). Con otra cámara solo valen las ramas 1 y 3: la cilíndrica necesita la calibración de WoodScape.
+      En la Mac, la terminal necesita el permiso de Grabación de pantalla (Ajustes del Sistema → Privacidad y seguridad).</div>
+    <div id="selector" hidden>
+      <div class="nota">Arrastrá sobre la captura para marcar la región del video. <button type="button" class="boton" id="cerrar-selector">Listo</button></div>
+      <div id="selector-lienzo"><img id="captura" alt="captura del monitor"><div id="marco"></div></div>
+    </div>
+    <figure id="vivo-fig"><img id="vivo" alt="video con detecciones"></figure>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let info = null, archivo = null, vista = "fisheye", enVivo = false;
+let urlOrig = null;
+
+const modeloActual = () => info.modelos.find(m => m.nombre === $("modelo").value);
+const esCil = () => $("proyeccion").value === "cilindrica";
+const panelActivo = () => document.querySelector(".pestanas .activo").dataset.panel;
+
+async function cargarModelos() {
+  info = await (await fetch("/modelos")).json();
+  for (const m of info.modelos) {
+    const ramas = Object.values(m.ramas).join(" / ");
+    const o = new Option(`${m.nombre} · ${m.descripcion} (${ramas})${m.disponible ? "" : " · sin pesos"}`, m.nombre);
+    o.disabled = !m.disponible;
+    $("modelo").add(o);
+  }
+  for (const c of info.camaras) $("camara").add(new Option(c, c));
+  if (!info.cilindrica_disponible) {
+    const o = $("proyeccion").querySelector('[value="cilindrica"]');
+    o.disabled = true;
+    o.textContent += " · falta CV2/";
+  }
+  const elegido = info.modelos.find(m => m.disponible && m.nombre !== "coco") || info.modelos.find(m => m.disponible);
+  if (elegido) $("modelo").value = elegido.nombre;
+  usarProyeccionDelModelo();
+  $("estado").textContent = `device: ${info.device} · imgsz: ${info.imgsz}`;
+}
+
+async function cargarVideos(elegir) {
+  const d = await (await fetch("/videos")).json();
+  $("video").innerHTML = "";
+  for (const v of d.videos) {
+    const seg = v.fps ? Math.round(v.frames / v.fps) : "?";
+    const extra = v.imagenes ? ` · ${v.imagenes} imágenes ${v.camara}` : "";
+    $("video").add(new Option(`${v.nombre} (${v.ancho}×${v.alto}, ${v.fps} fps, ${seg} s${extra})`, v.nombre));
+  }
+  if (elegir) $("video").value = elegir;
+  mostrarFuente();
+  if (!d.videos.length)
+    $("estado-video").innerHTML = `No hay videos en <code>${d.carpeta}</code>. Armá uno con ` +
+      `<code>uv run python tools/hacer_video.py --camara FV</code> o subí uno.`;
+}
+
+function usarProyeccionDelModelo() {
+  // cada modelo arranca con el preprocesamiento con el que se evaluó (la rama 4 se entrenó sobre la cilíndrica)
+  const m = modeloActual();
+  if (m && (m.proyeccion !== "cilindrica" || info.cilindrica_disponible)) $("proyeccion").value = m.proyeccion;
+  actualizarControles();
+}
+
+function textoRama() {
+  const m = modeloActual();
+  const rama = m && m.ramas[$("proyeccion").value];
+  return `<b>${m.nombre}</b> <span class="chip ${rama ? "rama" : "fuera"}">${rama || "fuera del 2×2"}</span>`;
+}
+
+function actualizarControles() {
+  // en Imagen se comparan todos los modelos: el modelo y el preprocesamiento solo se eligen en Video
+  const enImagen = panelActivo() === "imagen";
+  document.querySelectorAll(".solo-tab-video").forEach(e => e.hidden = enImagen);
+  $("fila-cil").hidden = enImagen ? !(info && info.cilindrica_disponible) : !esCil();
+  document.querySelectorAll("#vista button").forEach(b => b.classList.toggle("activo", b.dataset.vista === vista));
+}
+
+function cambio() {
+  // cualquier control vuelve a correr lo que se esté mostrando
+  if (panelActivo() === "imagen") compararTodos();
+  else if (enVivo) iniciarVivo();
+}
+
+// ---------------------------------------------------------------- imagen: todos los modelos
+
+let corrida = 0;  // si cambia algo a mitad de una comparacion, la vieja deja de pintar
+const urlsRes = [];
+const NOMBRE_PROY = { fisheye: "ninguno (imagen fisheye)", cilindrica: "proyección cilíndrica" };
+const CLASES = ["vehicle", "person", "two_wheeler"];
+
+function combinaciones() {
+  // cada modelo con cada preprocesamiento con el que forma una rama del 2x2, en orden de rama
+  const c = [];
+  for (const m of info.modelos)
+    for (const [proy, rama] of Object.entries(m.ramas)) c.push({ modelo: m, proy, rama });
+  return c.sort((a, b) => a.rama.localeCompare(b.rama, "es", { numeric: true }));
+}
+
+function elegir(f) {
+  if (!f || !f.type.startsWith("image/")) return;
+  archivo = f;
+  if (urlOrig) URL.revokeObjectURL(urlOrig);
+  urlOrig = URL.createObjectURL(f);
+  $("orig").src = urlOrig;
+  $("titulo-orig").textContent = `Original · ${f.name}`;
+  $("cabecera").hidden = false;
+  compararTodos();
+}
+
+function tarjeta(c, i) {
+  return `<div class="resultado" id="res-${i}">
+    <div class="vacia" id="img-${i}">${c.modelo.disponible ? "esperando…" : "sin pesos"}</div>
+    <div class="texto">
+      <h3><span class="chip rama">${c.rama}</span>${c.modelo.nombre}</h3>
+      <dl>
+        <dt>Modelo</dt><dd>${c.modelo.descripcion}</dd>
+        <dt>Preprocesamiento</dt><dd>${NOMBRE_PROY[c.proy]}</dd>
+        <dt>Detecciones</dt><dd id="det-${i}">–</dd>
+        <dt>Confianza media</dt><dd id="conf-${i}">–</dd>
+        <dt>Tiempos</dt><dd id="t-${i}">–</dd>
+      </dl>
+    </div>
+  </div>`;
+}
+
+async function compararTodos() {
+  if (!archivo || !info) return;
+  const mia = ++corrida;
+  const combos = combinaciones();
+  urlsRes.splice(0).forEach(u => URL.revokeObjectURL(u));
+  $("resultados").innerHTML = combos.map(tarjeta).join("");
+  $("tabla").tBodies[0].innerHTML = "";
+  const filas = [];
+  for (const [i, c] of combos.entries()) {
+    if (mia !== corrida) return;
+    $("estado").textContent = `Detectando ${i + 1} de ${combos.length}: ${c.rama} (${c.modelo.nombre})… ` +
+                              "la primera vez con cada modelo o cámara tarda más porque los carga";
+    const fila = { c, error: null };
+    if (!c.modelo.disponible) fila.error = "sin pesos";
+    else if (c.proy === "cilindrica" && !info.cilindrica_disponible) fila.error = "falta CV2/";
+    else {
+      try {
+        const fd = new FormData();
+        fd.append("imagen", archivo);
+        fd.append("modelo", c.modelo.nombre);
+        fd.append("conf", $("conf").value);
+        fd.append("proyeccion", c.proy);
+        fd.append("camara", $("camara").value);
+        fd.append("vista", c.proy === "cilindrica" ? vista : "fisheye");
+        const r = await fetch("/detectar", { method: "POST", body: fd });
+        if (!r.ok) {
+          let msg = r.statusText;
+          try { msg = (await r.json()).detail; } catch {}
+          throw new Error(msg);
+        }
+        const url = URL.createObjectURL(await r.blob());
+        urlsRes.push(url);
+        const h = k => r.headers.get(k);
+        Object.assign(fila, {
+          url, conteo: JSON.parse(h("X-Detecciones") || "{}"), confMedia: h("X-Confianza-Media") === null ? null : Number(h("X-Confianza-Media")),
+          inf: Number(h("X-Latencia-Ms")), total: Number(h("X-Total-Ms")), remap: Number(h("X-Remap-Ms")),
+          reproy: Number(h("X-Reproyeccion-Ms")), calib: h("X-Calibracion"),
+        });
+      } catch (e) {
+        fila.error = e.message;
+      }
+    }
+    if (mia !== corrida) return;
+    filas.push(fila);
+    pintar(i, fila);
+  }
+  pintarTabla(filas);
+  $("estado").textContent = `Listo: ${filas.filter(f => !f.error).length} de ${combos.length} combinaciones · ` +
+                            `confianza ≥ ${$("conf").value} · device ${info.device}`;
+}
+
+function pintar(i, f) {
+  if (f.error) {
+    $(`img-${i}`).textContent = "no se pudo correr";
+    $(`det-${i}`).innerHTML = `<span class="error">${f.error}</span>`;
+    return;
+  }
+  const img = new Image();
+  img.src = f.url;
+  img.alt = `detecciones de ${f.c.rama}`;
+  img.title = "clic para verla en tamaño completo";
+  img.onclick = () => window.open(f.url, "_blank");
+  $(`img-${i}`).replaceWith(img);
+  const total = Object.values(f.conteo).reduce((a, b) => a + b, 0);
+  $(`det-${i}`).innerHTML = (CLASES.filter(k => f.conteo[k]).map(k => `<span class="chip">${k}: ${f.conteo[k]}</span>`)
+                             .join("") || "ninguna") + `<br>total ${total}`;
+  $(`conf-${i}`).textContent = total && f.confMedia !== null ? f.confMedia.toFixed(2) : "–";
+  $(`t-${i}`).innerHTML = (f.c.proy === "cilindrica"
+      ? `inferencia ${f.inf.toFixed(1)} ms<br>remap ${f.remap.toFixed(1)} ms` +
+        (vista === "fisheye" ? ` · reproyección ${f.reproy.toFixed(1)} ms` : "") + `<br>total ${f.total.toFixed(1)} ms` +
+        `<br><span class="nota">calibración ${f.calib}</span>`
+      : `inferencia ${f.inf.toFixed(1)} ms<br>total ${f.total.toFixed(1)} ms`);
+}
+
+function pintarTabla(filas) {
+  // sin resaltar "el mejor": mas detecciones no es mejor sin el ground truth (pueden ser falsos positivos)
+  const total = f => Object.values(f.conteo).reduce((a, b) => a + b, 0);
+  $("tabla").tBodies[0].innerHTML = filas.map(f => f.error
+    ? `<tr><td>${f.c.rama}</td><td>${f.c.modelo.nombre}</td><td colspan="7" class="error" style="text-align:left">${f.error}</td></tr>`
+    : `<tr><td>${f.c.rama}</td><td>${f.c.modelo.nombre}</td>` +
+      CLASES.map(k => `<td>${f.conteo[k] || 0}</td>`).join("") + `<td>${total(f)}</td>` +
+      `<td>${total(f) && f.confMedia !== null ? f.confMedia.toFixed(2) : "–"}</td><td>${f.inf.toFixed(1)}</td><td>${f.total.toFixed(1)}</td></tr>`
+  ).join("");
+}
+
+// ---------------------------------------------------------------- video en vivo
+
+// ---------------------------------------------------------------- fuente: pantalla
+
+let monitores = [], region = null;
+try { region = JSON.parse(localStorage.getItem("region") || "null"); } catch {}
+const esPantalla = () => $("fuente").value === "pantalla";
+
+function mostrarFuente() {
+  document.querySelectorAll(".solo-video").forEach(e => e.hidden = esPantalla());
+  document.querySelectorAll(".solo-pantalla").forEach(e => e.hidden = !esPantalla());
+  $("region-txt").textContent = region ? `${region.w}×${region.h} en (${region.x}, ${region.y})` : "sin región";
+  $("iniciar").disabled = esPantalla() ? !region : !$("video").value;
+  if (esPantalla() && !monitores.length) cargarMonitores();
+}
+
+async function cargarMonitores() {
+  try {
+    const r = await fetch("/pantalla/monitores");
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail);
+    monitores = d.monitores;
+    $("monitor").innerHTML = "";
+    monitores.forEach((m, i) => $("monitor").add(new Option(`${i + 1}: ${m.width}×${m.height}`, i + 1)));
+  } catch (e) {
+    $("estado-video").innerHTML = `<span class="error">Error: ${e.message}</span>`;
+  }
+}
+
+async function abrirSelector() {
+  if (!monitores.length) await cargarMonitores();
+  if (!monitores.length) return;
+  detenerVivo();
+  $("captura").src = `/pantalla/captura?monitor=${$("monitor").value}&t=${Date.now()}`;
+  $("marco").style.display = "none";
+  $("selector").hidden = false;
+  $("vivo-fig").hidden = true;  // mientras se elige la region no hace falta el panel del stream
+}
+
+(() => {
+  // arrastrar sobre la captura: el rectangulo en pixeles de la pagina se pasa a puntos del monitor
+  const lienzo = $("selector-lienzo"), marco = $("marco");
+  let ini = null;
+  const pos = e => { const r = lienzo.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top, r]; };
+  lienzo.onmousedown = e => { const [x, y] = pos(e); ini = [x, y]; marco.style.display = "block"; mover(x, y); };
+  const mover = (x, y) => {
+    const [x0, y0] = ini;
+    Object.assign(marco.style, { left: Math.min(x, x0) + "px", top: Math.min(y, y0) + "px",
+                                 width: Math.abs(x - x0) + "px", height: Math.abs(y - y0) + "px" });
+  };
+  lienzo.onmousemove = e => { if (ini) { const [x, y] = pos(e); mover(x, y); } };
+  window.addEventListener("mouseup", e => {
+    if (!ini) return;
+    const [x, y, r] = pos(e);
+    const m = monitores[$("monitor").value - 1], k = m.width / r.width;  // puntos del monitor por pixel de la pagina
+    const cx = v => Math.max(0, Math.min(r.width, v)), cy = v => Math.max(0, Math.min(r.height, v));
+    const [x0, x1] = [cx(Math.min(x, ini[0])), cx(Math.max(x, ini[0]))];
+    const [y0, y1] = [cy(Math.min(y, ini[1])), cy(Math.max(y, ini[1]))];
+    ini = null;
+    if (x1 - x0 < 5 || y1 - y0 < 5) return;
+    region = { x: Math.round(m.left + x0 * k), y: Math.round(m.top + y0 * k),
+               w: Math.round((x1 - x0) * k), h: Math.round((y1 - y0) * k) };
+    try { localStorage.setItem("region", JSON.stringify(region)); } catch {}
+    mostrarFuente();
+  });
+})();
+
+function iniciarVivo() {
+  if (esPantalla() ? !region : !$("video").value) return;
+  $("selector").hidden = true;
+  $("vivo-fig").hidden = false;
+  const fuente = esPantalla() ? { fuente: "pantalla", ...region } : { video: $("video").value };
+  const p = new URLSearchParams({
+    ...fuente, modelo: $("modelo").value, conf: $("conf").value, proyeccion: $("proyeccion").value,
+    camara: $("camara").value, vista: esCil() ? vista : "fisheye", fps: $("fps").value, t: Date.now(),
+  });
+  $("vivo").src = "/en_vivo?" + p;  // el servidor corta la transmisión anterior
+  enVivo = true;
+  $("iniciar").textContent = "Detener";
+  $("iniciar").classList.remove("primario");
+  $("estado-video").innerHTML = `${textoRama()} · ${esCil() ? "proyección cilíndrica" : "imagen fisheye"} · transmitiendo`;
+}
+
+function detenerVivo() {
+  if (!enVivo) return;
+  enVivo = false;
+  $("vivo").removeAttribute("src");
+  fetch("/en_vivo/detener", { method: "POST" });
+  $("iniciar").textContent = "Iniciar";
+  $("iniciar").classList.add("primario");
+  $("estado-video").textContent = "Detenido";
+}
+
+async function subirVideo(f) {
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("video", f);
+  $("estado-video").textContent = `Subiendo ${f.name}…`;
+  try {
+    const r = await fetch("/videos", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.statusText);
+    await cargarVideos(d.nombre);
+    $("estado-video").textContent = `Listo: ${d.nombre}`;
+  } catch (e) {
+    $("estado-video").innerHTML = `<span class="error">Error: ${e.message}</span>`;
+  }
+}
+
+// ---------------------------------------------------------------- eventos
+
+$("zona").onclick = () => $("archivo").click();
+$("archivo").onchange = e => elegir(e.target.files[0]);
+$("zona").ondragover = e => { e.preventDefault(); $("zona").classList.add("encima"); };
+$("zona").ondragleave = () => $("zona").classList.remove("encima");
+$("zona").ondrop = e => { e.preventDefault(); $("zona").classList.remove("encima"); elegir(e.dataTransfer.files[0]); };
+
+$("modelo").onchange = () => { usarProyeccionDelModelo(); cambio(); };
+$("proyeccion").onchange = () => { actualizarControles(); cambio(); };
+$("camara").onchange = cambio;
+document.querySelectorAll("#vista button").forEach(b => b.onclick = () => {
+  vista = b.dataset.vista;
+  actualizarControles();
+  cambio();
+});
+$("conf").oninput = () => $("confv").textContent = Number($("conf").value).toFixed(2);
+$("conf").onchange = cambio;
+
+document.querySelectorAll(".pestanas button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".pestanas button").forEach(x => x.classList.toggle("activo", x === b));
+  $("panel-imagen").hidden = b.dataset.panel !== "imagen";
+  $("panel-video").hidden = b.dataset.panel !== "video";
+  actualizarControles();
+  if (b.dataset.panel === "imagen") detenerVivo();
+  else cargarVideos($("video").value);
+});
+$("video").onchange = () => { if (enVivo) iniciarVivo(); };
+$("fps").onchange = () => { if (enVivo) iniciarVivo(); };
+$("iniciar").onclick = () => enVivo ? detenerVivo() : iniciarVivo();
+$("subir").onclick = () => $("archivo-video").click();
+$("fuente").onchange = () => { detenerVivo(); mostrarFuente(); };
+$("elegir-region").onclick = abrirSelector;
+$("cerrar-selector").onclick = () => { $("selector").hidden = true; $("vivo-fig").hidden = false; };
+$("monitor").onchange = () => { if (!$("selector").hidden) abrirSelector(); };
+$("archivo-video").onchange = e => subirVideo(e.target.files[0]);
+
+cargarModelos().catch(e => $("estado").innerHTML = `<span class="error">No pude leer /modelos: ${e.message}</span>`);
+</script>
+</body>
+</html>
