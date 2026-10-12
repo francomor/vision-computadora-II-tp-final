@@ -13,17 +13,39 @@
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
   main { max-width: 1280px; margin: 0 auto; padding: 24px 16px; }
   h1 { font-size: 1.25rem; margin: 0 0 16px; }
-  .controles { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; background: var(--card);
+  .controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; background: var(--card);
                border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-  label { font-size: .9rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
-  select { font: inherit; padding: 4px 6px; }
+  .fila { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; width: 100%; }
+  label { font-size: .9rem; color: var(--muted); display: flex; gap: 8px; align-items: center; max-width: 100%; }
+  select { font: inherit; padding: 4px 6px; min-width: 0; max-width: 100%; }
   #confv { font-variant-numeric: tabular-nums; color: var(--text); min-width: 2.5em; }
-  #zona { flex: 1; min-width: 220px; border: 2px dashed var(--line); border-radius: 8px; padding: 12px;
-          text-align: center; color: var(--muted); cursor: pointer; }
+  .segmentado { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .segmentado button { font: inherit; font-size: .85rem; border: 0; padding: 4px 10px; cursor: pointer;
+                       background: transparent; color: var(--muted); }
+  .segmentado button.activo { background: var(--accent); color: #fff; }
+  .solo-cil[hidden] { display: none; }
+
+  .pestanas { display: flex; gap: 4px; margin: 18px 0 0; border-bottom: 1px solid var(--line); }
+  .pestanas button { font: inherit; font-size: .95rem; border: 0; background: none; color: var(--muted);
+                     padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .pestanas button.activo { color: var(--text); border-bottom-color: var(--accent); }
+  .panel { padding-top: 14px; }
+  .panel[hidden] { display: none; }
+
+  #zona { border: 2px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center;
+          color: var(--muted); cursor: pointer; background: var(--card); }
   #zona.encima { border-color: var(--accent); color: var(--accent); }
-  #estado { margin: 14px 2px; font-size: .95rem; min-height: 1.4em; }
-  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line);
-          margin-left: 6px; font-size: .85rem; }
+  .boton { font: inherit; font-size: .9rem; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .boton.primario { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .boton:disabled { opacity: .5; cursor: default; }
+
+  .estado { margin: 14px 2px 4px; font-size: .95rem; min-height: 1.4em; line-height: 1.8; }
+  .nota { margin: 0 2px 14px; font-size: .85rem; color: var(--muted); min-height: 1.2em; }
+  .chip { display: inline-block; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--line);
+          margin-left: 6px; font-size: .85rem; white-space: nowrap; }
+  .rama { border-color: var(--accent); color: var(--accent); }
+  .fuera { border-color: #d97706; color: #d97706; }
   .error { color: #d92d20; }
   .paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 800px) { .paneles { grid-template-columns: 1fr; } }
@@ -31,6 +53,7 @@
   figcaption { font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
   figure img { width: 100%; display: block; border-radius: 6px; }
   figure img:not([src]) { visibility: hidden; height: 200px; }
+  #vivo-fig img:not([src]) { visibility: visible; height: auto; aspect-ratio: 1280 / 966; background: #0b0d10; }
 </style>
 </head>
 <body>
@@ -38,36 +61,144 @@
   <h1>Detección de objetos en imágenes fisheye · YOLO11</h1>
 
   <div class="controles">
-    <label>Modelo <select id="modelo"></select></label>
-    <label>Confianza <input id="conf" type="range" min="0.05" max="0.9" step="0.05" value="0.25"><span id="confv">0.25</span></label>
+    <div class="fila">
+      <label>Modelo <select id="modelo"></select></label>
+      <label>Preprocesamiento
+        <select id="proyeccion">
+          <option value="fisheye">ninguno, imagen fisheye</option>
+          <option value="cilindrica">proyección cilíndrica (rama 2)</option>
+        </select>
+      </label>
+      <label>Confianza <input id="conf" type="range" min="0.05" max="0.9" step="0.05" value="0.25"><span id="confv">0.25</span></label>
+    </div>
+    <div class="fila solo-cil" hidden>
+      <label>Cámara
+        <select id="camara"><option value="auto">automática (del nombre del archivo)</option></select>
+      </label>
+      <label>Ver cajas en
+        <span class="segmentado" id="vista">
+          <button type="button" data-vista="fisheye" class="activo">fisheye</button>
+          <button type="button" data-vista="cilindrica">cilíndrica</button>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="pestanas">
+    <button type="button" data-panel="imagen" class="activo">Imagen</button>
+    <button type="button" data-panel="video">Video en vivo</button>
+  </div>
+
+  <section class="panel" id="panel-imagen">
     <div id="zona">Arrastrá una imagen acá o hacé clic para elegirla</div>
     <input id="archivo" type="file" accept="image/*" hidden>
-  </div>
+    <div class="estado" id="estado"></div>
+    <div class="nota" id="nota"></div>
+    <div class="paneles">
+      <figure><figcaption>Original</figcaption><img id="orig" alt="imagen original"></figure>
+      <figure><figcaption id="titulo-res">Detecciones</figcaption><img id="res" alt="imagen con detecciones"></figure>
+    </div>
+  </section>
 
-  <div id="estado"></div>
-
-  <div class="paneles">
-    <figure><figcaption>Original</figcaption><img id="orig" alt="imagen original"></figure>
-    <figure><figcaption>Detecciones</figcaption><img id="res" alt="imagen con detecciones"></figure>
-  </div>
+  <section class="panel" id="panel-video" hidden>
+    <div class="controles">
+      <div class="fila">
+        <label>Video <select id="video"></select></label>
+        <button type="button" class="boton" id="subir">Subir otro…</button>
+        <input id="archivo-video" type="file" accept="video/*" hidden>
+        <label>Ritmo de la cámara
+          <select id="fps">
+            <option value="0">los fps del video</option>
+            <option value="10">10 fps</option>
+            <option value="15">15 fps</option>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </label>
+        <button type="button" class="boton primario" id="iniciar">Iniciar</button>
+      </div>
+    </div>
+    <div class="estado" id="estado-video"></div>
+    <div class="nota" id="nota-video">Los frames llegan al ritmo de la cámara: si el modelo tarda más que un frame, los que pasaron se descartan.
+      Las imágenes de WoodScape no son consecutivas, así que cada escena es distinta.</div>
+    <figure id="vivo-fig"><img id="vivo" alt="video con detecciones"></figure>
+  </section>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
-let archivo = null;
+let info = null, archivo = null, vista = "fisheye", enVivo = false;
 let urlOrig = null, urlRes = null;
 
+const modeloActual = () => info.modelos.find(m => m.nombre === $("modelo").value);
+const esCil = () => $("proyeccion").value === "cilindrica";
+const panelActivo = () => document.querySelector(".pestanas .activo").dataset.panel;
+
 async function cargarModelos() {
-  const d = await (await fetch("/modelos")).json();
-  for (const m of d.modelos) {
-    const o = new Option(`${m.nombre} · ${m.descripcion}${m.disponible ? "" : " (sin pesos)"}`, m.nombre);
+  info = await (await fetch("/modelos")).json();
+  for (const m of info.modelos) {
+    const ramas = Object.values(m.ramas).join(" / ");
+    const o = new Option(`${m.nombre} · ${m.descripcion} (${ramas})${m.disponible ? "" : " · sin pesos"}`, m.nombre);
     o.disabled = !m.disponible;
     $("modelo").add(o);
   }
-  const elegido = d.modelos.find(m => m.disponible && m.nombre !== "coco") || d.modelos.find(m => m.disponible);
+  for (const c of info.camaras) $("camara").add(new Option(c, c));
+  if (!info.cilindrica_disponible) {
+    const o = $("proyeccion").querySelector('[value="cilindrica"]');
+    o.disabled = true;
+    o.textContent += " · falta CV2/";
+  }
+  const elegido = info.modelos.find(m => m.disponible && m.nombre !== "coco") || info.modelos.find(m => m.disponible);
   if (elegido) $("modelo").value = elegido.nombre;
-  $("estado").textContent = `device: ${d.device} · imgsz: ${d.imgsz}`;
+  usarProyeccionDelModelo();
+  $("estado").textContent = `device: ${info.device} · imgsz: ${info.imgsz}`;
 }
+
+async function cargarVideos(elegir) {
+  const d = await (await fetch("/videos")).json();
+  $("video").innerHTML = "";
+  for (const v of d.videos) {
+    const seg = v.fps ? Math.round(v.frames / v.fps) : "?";
+    const extra = v.imagenes ? ` · ${v.imagenes} imágenes ${v.camara}` : "";
+    $("video").add(new Option(`${v.nombre} (${v.ancho}×${v.alto}, ${v.fps} fps, ${seg} s${extra})`, v.nombre));
+  }
+  if (elegir) $("video").value = elegir;
+  $("iniciar").disabled = !d.videos.length;
+  if (!d.videos.length)
+    $("estado-video").innerHTML = `No hay videos en <code>${d.carpeta}</code>. Armá uno con ` +
+      `<code>uv run python tools/hacer_video.py --camara FV</code> o subí uno.`;
+}
+
+function usarProyeccionDelModelo() {
+  // cada modelo arranca con el preprocesamiento con el que se evaluó (la rama 4 se entrenó sobre la cilíndrica)
+  const m = modeloActual();
+  if (m && (m.proyeccion !== "cilindrica" || info.cilindrica_disponible)) $("proyeccion").value = m.proyeccion;
+  actualizarControles();
+}
+
+function textoRama() {
+  const m = modeloActual();
+  const rama = m && m.ramas[$("proyeccion").value];
+  return `<b>${m.nombre}</b> <span class="chip ${rama ? "rama" : "fuera"}">${rama || "fuera del 2×2"}</span>`;
+}
+
+function actualizarControles() {
+  document.querySelectorAll(".solo-cil").forEach(e => e.hidden = !esCil());
+  document.querySelectorAll("#vista button").forEach(b => b.classList.toggle("activo", b.dataset.vista === vista));
+  const m = modeloActual();
+  const rama = m && m.ramas[$("proyeccion").value];
+  $("nota").textContent = !m || rama ? "" :
+    esCil() ? `${m.nombre} se entrenó sobre la fisheye: con la cilíndrica queda fuera del diseño 2×2.`
+            : `${m.nombre} se entrenó sobre la cilíndrica: sin ese preprocesamiento queda fuera del diseño 2×2.`;
+}
+
+function cambio() {
+  // cualquier control vuelve a correr lo que se esté mostrando
+  if (panelActivo() === "imagen") detectar();
+  else if (enVivo) iniciarVivo();
+}
+
+// ---------------------------------------------------------------- imagen
 
 function elegir(f) {
   if (!f || !f.type.startsWith("image/")) return;
@@ -75,16 +206,21 @@ function elegir(f) {
   if (urlOrig) URL.revokeObjectURL(urlOrig);
   urlOrig = URL.createObjectURL(f);
   $("orig").src = urlOrig;
+  $("titulo-res").textContent = "Detecciones";
   detectar();
 }
 
 async function detectar() {
   if (!archivo) return;
+  const cil = esCil();
   const fd = new FormData();
   fd.append("imagen", archivo);
   fd.append("modelo", $("modelo").value);
   fd.append("conf", $("conf").value);
-  $("estado").textContent = "Detectando… (la primera vez con cada modelo tarda más porque lo carga)";
+  fd.append("proyeccion", $("proyeccion").value);
+  fd.append("camara", $("camara").value);
+  fd.append("vista", cil ? vista : "fisheye");
+  $("estado").textContent = "Detectando… (la primera vez con cada modelo o cámara tarda más porque los carga)";
   try {
     const r = await fetch("/detectar", { method: "POST", body: fd });
     if (!r.ok) {
@@ -95,24 +231,96 @@ async function detectar() {
     if (urlRes) URL.revokeObjectURL(urlRes);
     urlRes = URL.createObjectURL(await r.blob());
     $("res").src = urlRes;
-    const conteo = JSON.parse(r.headers.get("X-Detecciones") || "{}");
+
+    const h = k => r.headers.get(k);
+    const conteo = JSON.parse(h("X-Detecciones") || "{}");
     const chips = Object.entries(conteo).map(([k, v]) => `<span class="chip">${k}: ${v}</span>`).join("")
                   || '<span class="chip">sin detecciones</span>';
-    $("estado").innerHTML = `<b>${$("modelo").value}</b> · inferencia ${r.headers.get("X-Latencia-Ms")} ms ` +
-                            `(total ${r.headers.get("X-Total-Ms")} ms) ${chips}`;
+    const tiempos = cil
+      ? `remap ${h("X-Remap-Ms")} ms · inferencia ${h("X-Latencia-Ms")} ms` +
+        (vista === "fisheye" ? ` · reproyección ${h("X-Reproyeccion-Ms")} ms` : "") + ` · total ${h("X-Total-Ms")} ms`
+      : `inferencia ${h("X-Latencia-Ms")} ms (total ${h("X-Total-Ms")} ms)`;
+    $("estado").innerHTML = `${textoRama()} · ${tiempos}` + (cil ? ` · calibración ${h("X-Calibracion")}` : "") + ` ${chips}`;
+    $("titulo-res").textContent = !cil ? "Detecciones"
+      : vista === "fisheye" ? "Detecciones en la cilíndrica, llevadas a la fisheye (lo oscurecido queda fuera de la banda de ±45°)"
+      : "Imagen cilíndrica con las detecciones";
   } catch (e) {
     $("estado").innerHTML = `<span class="error">Error: ${e.message}</span>`;
   }
 }
+
+// ---------------------------------------------------------------- video en vivo
+
+function iniciarVivo() {
+  if (!$("video").value) return;
+  const p = new URLSearchParams({
+    video: $("video").value, modelo: $("modelo").value, conf: $("conf").value, proyeccion: $("proyeccion").value,
+    camara: $("camara").value, vista: esCil() ? vista : "fisheye", fps: $("fps").value, t: Date.now(),
+  });
+  $("vivo").src = "/en_vivo?" + p;  // el servidor corta la transmisión anterior
+  enVivo = true;
+  $("iniciar").textContent = "Detener";
+  $("iniciar").classList.remove("primario");
+  $("estado-video").innerHTML = `${textoRama()} · ${esCil() ? "proyección cilíndrica" : "imagen fisheye"} · transmitiendo`;
+}
+
+function detenerVivo() {
+  if (!enVivo) return;
+  enVivo = false;
+  $("vivo").removeAttribute("src");
+  fetch("/en_vivo/detener", { method: "POST" });
+  $("iniciar").textContent = "Iniciar";
+  $("iniciar").classList.add("primario");
+  $("estado-video").textContent = "Detenido";
+}
+
+async function subirVideo(f) {
+  if (!f) return;
+  const fd = new FormData();
+  fd.append("video", f);
+  $("estado-video").textContent = `Subiendo ${f.name}…`;
+  try {
+    const r = await fetch("/videos", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.statusText);
+    await cargarVideos(d.nombre);
+    $("estado-video").textContent = `Listo: ${d.nombre}`;
+  } catch (e) {
+    $("estado-video").innerHTML = `<span class="error">Error: ${e.message}</span>`;
+  }
+}
+
+// ---------------------------------------------------------------- eventos
 
 $("zona").onclick = () => $("archivo").click();
 $("archivo").onchange = e => elegir(e.target.files[0]);
 $("zona").ondragover = e => { e.preventDefault(); $("zona").classList.add("encima"); };
 $("zona").ondragleave = () => $("zona").classList.remove("encima");
 $("zona").ondrop = e => { e.preventDefault(); $("zona").classList.remove("encima"); elegir(e.dataTransfer.files[0]); };
-$("modelo").onchange = detectar;                       // cambiar de modelo vuelve a detectar la misma imagen
+
+$("modelo").onchange = () => { usarProyeccionDelModelo(); cambio(); };
+$("proyeccion").onchange = () => { actualizarControles(); cambio(); };
+$("camara").onchange = cambio;
+document.querySelectorAll("#vista button").forEach(b => b.onclick = () => {
+  vista = b.dataset.vista;
+  actualizarControles();
+  cambio();
+});
 $("conf").oninput = () => $("confv").textContent = Number($("conf").value).toFixed(2);
-$("conf").onchange = detectar;
+$("conf").onchange = cambio;
+
+document.querySelectorAll(".pestanas button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".pestanas button").forEach(x => x.classList.toggle("activo", x === b));
+  $("panel-imagen").hidden = b.dataset.panel !== "imagen";
+  $("panel-video").hidden = b.dataset.panel !== "video";
+  if (b.dataset.panel === "imagen") detenerVivo();
+  else cargarVideos($("video").value);
+});
+$("video").onchange = () => { if (enVivo) iniciarVivo(); };
+$("fps").onchange = () => { if (enVivo) iniciarVivo(); };
+$("iniciar").onclick = () => enVivo ? detenerVivo() : iniciarVivo();
+$("subir").onclick = () => $("archivo-video").click();
+$("archivo-video").onchange = e => subirVideo(e.target.files[0]);
 
 cargarModelos().catch(e => $("estado").innerHTML = `<span class="error">No pude leer /modelos: ${e.message}</span>`);
 </script>
